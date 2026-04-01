@@ -1,0 +1,7 @@
+node_modules
+output
+.superpowers
+.git
+.gitignore
+*.md
+docs

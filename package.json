@@ -1,0 +1,22 @@
+{
+  "name": "json2card",
+  "version": "1.0.0",
+  "description": "Turn any JSON into beautiful shareable cards.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "type": "module",
+  "scripts": {
+    "generate": "node generate.mjs",
+    "start": "node server.mjs",
+    "setup-fonts": "node scripts/download-fonts.mjs",
+    "test": "node --test test-cards.mjs"
+  },
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "express": "^4.22.1",
+    "puppeteer": "^24.0.0",
+    "remove-markdown": "^0.6.3"
+  }
+}

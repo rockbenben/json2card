@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style id="font-css">{{FONT_FACE_CSS}}</style>
+<style id="base-css">
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: {{CARD_WIDTH}}px;
+  height: {{CARD_HEIGHT}}px;
+  background: transparent;
+  overflow: hidden;
+}
+.card {
+  width: {{CARD_WIDTH}}px;
+  height: {{CARD_HEIGHT}}px;
+  padding: 72px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  font-family: {{LABEL_FONT}}, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+.noise, .glow-tr, .glow-bl { position: absolute; pointer-events: none; }
+.noise { inset: 0; opacity: 0.05; }
+.glow-tr { top: -60px; right: -60px; width: 320px; height: 320px; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%); }
+.glow-bl { bottom: -80px; left: -40px; width: 280px; height: 280px; background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%); }
+.main { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.pill {
+  display: inline-flex; align-self: flex-start;
+  background: rgba(255,255,255,0.15); border-radius: 32px;
+  padding: 10px 28px; margin-bottom: 40px;
+  font-size: 24px; color: {{TEXT_COLOR}}; letter-spacing: 2px; white-space: nowrap;
+}
+.content { flex: 1; overflow: hidden; }
+.content p {
+  font-size: {{FONT_SIZE}}px; line-height: 2.0; color: {{TEXT_COLOR}};
+  margin-bottom: 16px; letter-spacing: 0.5px;
+  font-family: {{BODY_FONT}}, "PingFang SC", "Noto Serif SC", "SimSun", serif;
+}
+.content p:last-child { margin-bottom: 0; }
+.footer {
+  border-top: 1px solid rgba(255,255,255,0.15);
+  padding-top: 24px; margin-top: 32px;
+  display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
+}
+.footer-title { font-size: 20px; color: {{TEXT_COLOR}}; opacity: 0.4; letter-spacing: 2px; }
+.footer-right { display: flex; align-items: center; gap: 8px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: {{TEXT_COLOR}}; opacity: 0.25; }
+.dot.active { opacity: 0.85; }
+.page-num { font-size: 18px; color: {{TEXT_COLOR}}; opacity: 0.4; margin-left: 12px; }
+.pill:empty { display: none; }
+.deco { display: none; }
+.watermark {
+  position: absolute; bottom: 28px; right: 32px;
+  font-size: 16px; opacity: 0.25; letter-spacing: 1px;
+  color: {{TEXT_COLOR}}; pointer-events: none;
+}
+</style>
+<style id="card-css">{{STYLE_CSS}}</style>
+</head>
+<body>
+<div class="card">
+  <svg class="noise" xmlns="http://www.w3.org/2000/svg">
+    <filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/></filter>
+    <rect width="100%" height="100%" filter="url(#n)"/>
+  </svg>
+  <div class="glow-tr"></div>
+  <div class="glow-bl"></div>
+  <div class="deco"></div>
+  <div class="watermark">{{WATERMARK}}</div>
+  <div class="main">
+    <div class="pill">{{PILL_LABEL}}</div>
+    <div class="content">{{CONTENT_HTML}}</div>
+  </div>
+  <div class="footer">
+    <span class="footer-title">{{FOOTER_LEFT}}</span>
+    <div class="footer-right">
+      {{DOTS_HTML}}
+      <span class="page-num">{{PAGE_INDICATOR}}</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

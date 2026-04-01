@@ -1,0 +1,7 @@
+services:
+  json2card:
+    container_name: json2card
+    image: ghcr.io/rockbenben/json2card:latest
+    ports:
+      - "7882:3000"
+    restart: unless-stopped

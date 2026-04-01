@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Turn any JSON into beautiful shareable cards. Supports ChatGPT, Claude, Telegram, Discord, Slack and custom formats.">
+  <title>json2card</title>
+  <link rel="stylesheet" href="style.css?v=4">
+</head>
+<body>
+  <header>
+    <h1 data-i18n="title">json2card</h1>
+    <p class="subtitle" data-i18n="subtitle">Turn any JSON into beautiful shareable cards</p>
+    <div style="margin-left:auto;display:flex;gap:6px;">
+      <button id="langToggle" style="background:none;border:1px solid var(--btn-border);border-radius:6px;padding:4px 10px;cursor:pointer;color:var(--fg);font-size:12px;">EN/中</button>
+      <button id="themeToggle" style="background:none;border:1px solid var(--btn-border);border-radius:6px;padding:4px 10px;cursor:pointer;color:var(--fg);font-size:14px;">🌓</button>
+    </div>
+  </header>
+
+  <main>
+    <aside class="panel">
+      <section class="input-section">
+        <h2 data-i18n="dataInput"></h2>
+        <div class="input-actions">
+          <label class="upload-btn">
+            <span data-i18n="uploadJson"></span>
+            <input type="file" id="fileInput" accept=".json" hidden>
+          </label>
+          <button id="loadExample" data-i18n="loadExample"></button>
+        </div>
+        <textarea id="jsonInput" data-i18n-placeholder="jsonPlaceholder"></textarea>
+      </section>
+
+      <section class="mapping-section">
+        <h2><span data-i18n="mappingRules"></span> <button id="toggleMapping" class="toggle-btn">▶</button></h2>
+        <div id="mappingPanel" class="collapsed">
+          <div style="margin-bottom:10px;">
+            <label><span data-i18n="detectedFormat"></span> <select id="formatSelect"></select></label>
+            <p id="formatHint" class="hint"></p>
+          </div>
+          <label><span data-i18n="msgPath"></span>
+            <input type="text" id="mapMessages" value="messages" placeholder="messages">
+          </label>
+          <label><span data-i18n="contentField"></span>
+            <input type="text" id="mapContent" value="content" placeholder="content">
+          </label>
+          <label><span data-i18n="roleField"></span>
+            <input type="text" id="mapRole" value="role" placeholder="role">
+          </label>
+          <label><span data-i18n="userRoleValue"></span>
+            <input type="text" id="mapUserRole" value="user" placeholder="user">
+          </label>
+          <label><span data-i18n="charIdField"></span>
+            <input type="text" id="mapCharId" value="characterId" placeholder="characterId">
+          </label>
+          <label><span data-i18n="charListPath"></span>
+            <input type="text" id="mapCharacters" value="characters" placeholder="characters">
+          </label>
+          <button id="autoDetect" class="detect-btn" data-i18n="autoDetect"></button>
+        </div>
+      </section>
+
+      <section class="layout-section">
+        <h2 data-i18n="cardLayout"></h2>
+        <div class="slot-row" style="margin-bottom:12px;">
+          <span class="slot-label" data-i18n="preset"></span>
+          <select id="presetSelect"><option value="" data-i18n="custom"></option></select>
+        </div>
+        <div class="slot-row">
+          <span class="slot-label" data-i18n="slotBadge"></span>
+          <select id="slotBadge"></select>
+          <input type="text" id="slotBadgeText" class="slot-text" data-i18n-placeholder="customText">
+        </div>
+        <div class="slot-row">
+          <span class="slot-label" data-i18n="slotBody"></span>
+          <select id="slotBody"></select>
+          <input type="text" id="slotBodyText" class="slot-text" data-i18n-placeholder="customText">
+        </div>
+        <div class="slot-row">
+          <span class="slot-label" data-i18n="slotFooterLeft"></span>
+          <select id="slotFooterLeft"></select>
+          <input type="text" id="slotFooterLeftText" class="slot-text" data-i18n-placeholder="customText" value="圆桌论道">
+        </div>
+        <div class="slot-row">
+          <span class="slot-label" data-i18n="slotFooterRight"></span>
+          <select id="slotFooterRight"></select>
+          <input type="text" id="slotFooterRightText" class="slot-text" data-i18n-placeholder="customText">
+        </div>
+      </section>
+
+      <section class="config-section">
+        <h2 data-i18n="config"></h2>
+        <label><span data-i18n="coverTitle"></span> <input type="text" id="coverTitle" value="圆桌论道"></label>
+        <label><span data-i18n="watermark"></span> <input type="text" id="watermark" data-i18n-placeholder="watermarkPlaceholder"></label>
+        <label><span data-i18n="fontPairing"></span> <select id="fontPairing"></select></label>
+        <label><span data-i18n="bodyFont"></span> <select id="bodyFont"></select></label>
+        <label><span data-i18n="labelFont"></span> <select id="labelFont"></select></label>
+        <label><span data-i18n="fontSize"></span> <input type="range" id="fontSize" min="24" max="36" value="28"> <span id="fontSizeValue">28px</span></label>
+        <label><span data-i18n="cardStyle"></span> <select id="cardStyleSelect"></select></label>
+        <label><span data-i18n="textAlign"></span>
+          <select id="spTextAlign">
+            <option value="left" data-i18n="alignLeft"></option>
+            <option value="center" data-i18n="alignCenter"></option>
+          </select>
+        </label>
+        <label><span data-i18n="borderRadius"></span> <input type="range" id="spBorderRadius" min="0" max="48" value="40"> <span id="spBorderRadiusVal">40</span></label>
+        <label><span data-i18n="gradientAngle"></span> <input type="range" id="spGradientAngle" min="0" max="360" value="135"> <span id="spGradientAngleVal">135°</span></label>
+        <label><span data-i18n="noiseOpacity"></span> <input type="range" id="spNoiseOpacity" min="0" max="10" value="5"> <span id="spNoiseOpacityVal">5%</span></label>
+        <label><span data-i18n="glowIntensity"></span> <input type="range" id="spGlowIntensity" min="0" max="20" value="10"> <span id="spGlowIntensityVal">10%</span></label>
+        <label><span data-i18n="lineHeight"></span> <input type="range" id="spLineHeight" min="16" max="24" value="20"> <span id="spLineHeightVal">2.0</span></label>
+        <label><span data-i18n="quoteMark"></span>
+          <select id="spQuoteMark">
+            <option value="false" data-i18n="off"></option>
+            <option value="true" data-i18n="on"></option>
+          </select>
+        </label>
+        <div style="margin:8px 0;">
+          <button id="saveCustomPreset" class="detect-btn" data-i18n="savePreset"></button>
+        </div>
+        <label><span data-i18n="cardSize"></span> <select id="cardSize"></select></label>
+        <div id="characterColors"></div>
+      </section>
+
+      <section class="history-section">
+        <h2><span data-i18n="history"></span> <button id="clearHistory" class="clear-btn" data-i18n="clearHistory"></button></h2>
+        <div id="historyList"><p class="empty" data-i18n="noHistory"></p></div>
+      </section>
+    </aside>
+
+    <div class="preview-area">
+      <div id="previewCards" class="cards-grid">
+        <p class="empty" data-i18n="previewHint"></p>
+      </div>
+      <div class="export-bar">
+        <span id="cardCount"></span>
+        <button id="exportLongBtn" disabled data-i18n="exportLong"></button>
+        <button id="exportBtn" disabled data-i18n="exportZip"></button>
+      </div>
+    </div>
+  </main>
+
+  <script src="/vendor/remove-markdown.js"></script>
+  <script src="i18n.js?v=1"></script>
+  <script src="card-rules.js?v=1"></script>
+  <script src="app.js?v=7"></script>
+</body>
+</html>
