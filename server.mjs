@@ -4,7 +4,7 @@ import path from 'node:path';
 import express from 'express';
 import archiver from 'archiver';
 import puppeteer from 'puppeteer';
-import { renderCardsFromData, USER_STYLE, COLOR_PALETTE, CHAR_ICONS, CARD_SIZES, CARD_STYLES, STYLE_DEFAULTS, DEFAULT_SLOTS, PRESETS } from './generate.mjs';
+import { renderCardsFromData, USER_STYLE, COLOR_PALETTE, CHAR_ICONS, FIXED_ICONS, HIDDEN_ROLES, CARD_SIZES, CARD_STYLES, STYLE_DEFAULTS, DEFAULT_SLOTS, PRESETS } from './generate.mjs';
 import { scanFonts } from './fonts.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -62,7 +62,7 @@ function rateLimit(windowMs = 60000) {
 // ── API routes (before static middleware) ──
 
 app.get('/api/config', (req, res) => {
-  res.json({ userStyle: USER_STYLE, colorPalette: COLOR_PALETTE, icons: CHAR_ICONS, cardSizes: CARD_SIZES, cardStyles: CARD_STYLES, styleDefaults: STYLE_DEFAULTS, defaultSlots: DEFAULT_SLOTS, presets: PRESETS });
+  res.json({ userStyle: USER_STYLE, colorPalette: COLOR_PALETTE, icons: CHAR_ICONS, fixedIcons: FIXED_ICONS, hiddenRoles: HIDDEN_ROLES, cardSizes: CARD_SIZES, cardStyles: CARD_STYLES, styleDefaults: STYLE_DEFAULTS, defaultSlots: DEFAULT_SLOTS, presets: PRESETS });
 });
 
 // Scan once at startup, refresh via POST /api/fonts/refresh

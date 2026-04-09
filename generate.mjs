@@ -36,11 +36,16 @@ export const COLOR_PALETTE = [
 // 16 icons — one per palette color, no duplicates within 16 characters
 export const CHAR_ICONS = ['🎭', '🔥', '🌊', '⚡', '🌿', '🎵', '🔮', '⭐', '💎', '📖', '🏛', '🎯', '🌸', '🦋', '🍂', '🪶'];
 
+export const FIXED_ICONS = { moderator: '🎙️' };
+
+// Structural roles — completely removed from characters array (no color slot, no color panel)
+export const HIDDEN_ROLES = ['summary', 'you'];
+
 /** Get style for a character by index — guarantees no color/icon collision within 16 characters */
 export function getCharStyle(name, index = -1) {
   const i = index >= 0 ? index : Math.abs([...String(name)].reduce((h, c) => (h << 5) - h + c.charCodeAt(0), 0));
   const color = COLOR_PALETTE[i % COLOR_PALETTE.length];
-  const icon = CHAR_ICONS[i % CHAR_ICONS.length];
+  const icon = FIXED_ICONS[name.toLowerCase()] || CHAR_ICONS[i % CHAR_ICONS.length];
   return { ...color, textColor: 'white', icon, label: name, name };
 }
 
@@ -92,7 +97,7 @@ const DEFAULT_CONFIG = {
   fontSize: 28, cardSize: '3:4', coverTitle: 'Legend Talk',
   colorOverrides: {}, slots: { ...DEFAULT_SLOTS },
   cardStyle: 'classic', styleParams: { ...STYLE_DEFAULTS },
-  watermark: '',
+  watermark: '', coverExcludeRoles: ['Moderator'],
 };
 
 // ── Helpers ──
@@ -196,7 +201,9 @@ function buildCoverCard(data, config) {
   const userMsg = data.messages.find(m => m.role === 'user');
   const paras = userMsg ? userMsg.content.split(/\n+/).filter(l => l.trim()) : [];
   const summary = paras.filter(p => p.length >= 10).sort((a, b) => a.length - b.length)[0] || paras[0] || '';
+  const excludeSet = new Set((config.coverExcludeRoles || []).map(r => r.toLowerCase()));
   const names = (data.characters || [])
+    .filter(id => !excludeSet.has(id.toLowerCase()))
     .map(id => config.colorOverrides[id]?.name || id)
     .join('  ·  ');
 
@@ -323,8 +330,9 @@ function normalizeMessages(data) {
       characterId: speaker === userRole ? undefined : speaker,
     };
   });
+  const hiddenSet = new Set(HIDDEN_ROLES);
   const characters = [...new Set(messages.filter(m => m.role === 'character').map(m => m.characterId))]
-    .filter(id => id && !/^(summary|you)$/i.test(id));
+    .filter(id => id && !hiddenSet.has(id.toLowerCase()));
   return { ...data, messages, characters };
 }
 

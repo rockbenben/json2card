@@ -24,6 +24,7 @@ let currentConfig = {
   cardStyle: 'classic',
   styleParams: { ...STYLE_DEFAULTS },
   watermark: '',
+  coverExcludeRoles: ['Moderator'],
 };
 let availableFonts = [];
 let rawJson = null; // unparsed original JSON (before normalization)
@@ -70,12 +71,14 @@ let COLOR_PALETTE = [
   { gradientStart: '#6a9a8a', gradientEnd: '#4a7a6a' },
 ];
 let CHAR_ICONS = ['🎭', '🔥', '🌊', '⚡', '🌿', '🎵', '🔮', '⭐', '💎', '📖', '🏛', '🎯', '🌸', '🦋', '🍂', '🪶'];
+let FIXED_ICONS = { moderator: '🎙️' };
+let HIDDEN_ROLES = ['summary', 'you'];
 
 /** Get style by index — guarantees no collision within 16 characters */
 function getCharStyle(name, index) {
   const i = index >= 0 ? index : Math.abs([...String(name)].reduce((h, c) => (h << 5) - h + c.charCodeAt(0), 0));
   const color = COLOR_PALETTE[i % COLOR_PALETTE.length];
-  const icon = CHAR_ICONS[i % CHAR_ICONS.length];
+  const icon = FIXED_ICONS[name.toLowerCase()] || CHAR_ICONS[i % CHAR_ICONS.length];
   return { ...color, textColor: 'white', icon, label: name, name };
 }
 
@@ -121,6 +124,7 @@ function applyI18n() {
     currentConfig.coverTitle = t('defaultCoverTitle');
     $('#coverTitle').value = currentConfig.coverTitle;
   }
+  $('#coverExcludeRoles').value = (currentConfig.coverExcludeRoles || []).join(', ');
   if (currentConfig.slots.footerLeft === 'text:') {
     currentConfig.slots.footerLeft = 'text:' + t('defaultFooterLeft');
   }
@@ -196,6 +200,8 @@ async function loadServerConfig() {
     if (cfg.userStyle) USER_STYLE = cfg.userStyle;
     if (cfg.colorPalette) COLOR_PALETTE = cfg.colorPalette;
     if (cfg.icons) CHAR_ICONS = cfg.icons;
+    if (cfg.fixedIcons) FIXED_ICONS = cfg.fixedIcons;
+    if (cfg.hiddenRoles) { HIDDEN_ROLES = cfg.hiddenRoles; _hiddenSet = new Set(HIDDEN_ROLES.map(r => r.toLowerCase())); }
     if (cfg.cardStyles) CARD_STYLES = cfg.cardStyles;
     if (cfg.presets) PRESETS = cfg.presets;
 
@@ -348,6 +354,10 @@ function bindEvents() {
     }
   });
   $('#coverTitle').addEventListener('input', () => { currentConfig.coverTitle = $('#coverTitle').value; updatePreview(); });
+  $('#coverExcludeRoles').addEventListener('input', () => {
+    currentConfig.coverExcludeRoles = $('#coverExcludeRoles').value.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+    updatePreview();
+  });
   $('#watermark').addEventListener('input', () => { currentConfig.watermark = $('#watermark').value; updatePreview(); });
   // Font pairing
   $('#fontPairing').addEventListener('change', () => {
@@ -684,6 +694,8 @@ function extractContent(msg, field) {
   return String(val || '');
 }
 
+let _hiddenSet = new Set(HIDDEN_ROLES);
+
 /** Normalize any JSON to the roundtable format using current mapping */
 function normalizeJson(json) {
   const fmtId = detectedFormat?.id;
@@ -700,7 +712,7 @@ function normalizeJson(json) {
       return { role: isUser ? 'user' : 'character', content, characterId: isUser ? undefined : role };
     }).filter(m => m.content.trim());
     const characters = [...new Set(messages.filter(m => m.role === 'character').map(m => m.characterId))]
-      .filter(id => id && !/^(summary|you)$/i.test(id));
+      .filter(id => id && !_hiddenSet.has(id.toLowerCase()));
     return { type: 'roundtable', characters, messages, title: json.title || '' };
   }
 
@@ -711,7 +723,7 @@ function normalizeJson(json) {
       role: 'character', content: m.text, characterId: m.user,
     }));
     const characters = [...new Set(messages.map(m => m.characterId))]
-      .filter(id => id && !/^(summary|you)$/i.test(id));
+      .filter(id => id && !_hiddenSet.has(id.toLowerCase()));
     return { type: 'roundtable', characters, messages, title: '' };
   }
 
@@ -751,7 +763,7 @@ function normalizeJson(json) {
   if (!Array.isArray(characters)) {
     characters = [...new Set(messages.filter(m => m.role === 'character').map(m => m.characterId))];
   }
-  characters = characters.filter(id => id && !/^(summary|you)$/i.test(id));
+  characters = characters.filter(id => id && !_hiddenSet.has(id.toLowerCase()));
 
   return { type: 'roundtable', characters, messages, title: json.title || '' };
 }
@@ -906,10 +918,15 @@ function updatePreview() {
   const aspect = getAspect(currentConfig.cardSize || '3:4');
   container.innerHTML = '';
 
-  // Cover card
+  // Cover card — filter excluded roles
+  const excludeSet = new Set((currentConfig.coverExcludeRoles || []).map(r => r.toLowerCase()));
+  const coverNames = (currentData.characters || [])
+    .filter(id => !excludeSet.has(id.toLowerCase()))
+    .map(id => currentConfig.colorOverrides[id]?.name || id)
+    .join('  ·  ');
   const coverEl = createCardPreview({
     label: currentConfig.coverTitle || t('defaultCoverTitle'),
-    content: '(封面)',
+    content: coverNames || '(封面)',
     gradientStart: '#0c0c0c',
     gradientEnd: '#1a1a1a',
     textColor: '#f0e6d2',
@@ -1109,6 +1126,7 @@ function loadHistory() {
 
       $('#jsonInput').value = JSON.stringify(rawJson, null, 2);
       $('#coverTitle').value = currentConfig.coverTitle || t('defaultCoverTitle');
+      $('#coverExcludeRoles').value = (currentConfig.coverExcludeRoles || []).join(', ');
       $('#watermark').value = currentConfig.watermark || '';
       $('#fontSize').value = currentConfig.fontSize;
       $('#fontSizeValue').textContent = `${currentConfig.fontSize}px`;
