@@ -141,6 +141,7 @@ function applyI18n() {
     }
   }
   renderStyleGallery();
+  buildCharacterColorPanel();  // re-translate speaker-color field tooltips + header
 
   // Re-populate preset dropdown
   const presetMap = { roundtable: 'presetRoundtable', quote: 'presetQuote', note: 'presetNote', news: 'presetNews' };
@@ -296,7 +297,7 @@ async function loadFonts() {
   } catch {
     for (const sel of ['#bodyFont', '#labelFont']) {
       const el = $(sel);
-      el.innerHTML = '<option>系统默认</option>';
+      el.innerHTML = `<option>${t('sysDefault')}</option>`;
     }
   }
 }
@@ -306,7 +307,7 @@ function populateFontSelect(selector, fonts, defaultName) {
   el.innerHTML = fonts.map(f =>
     `<option value="${f.displayName}" ${f.displayName === defaultName ? 'selected' : ''}>${f.displayName}</option>`
   ).join('');
-  if (!fonts.length) el.innerHTML = '<option>系统默认</option>';
+  if (!fonts.length) el.innerHTML = `<option>${t('sysDefault')}</option>`;
 }
 
 // ── Custom font upload (embedded as data-URI, works in preview + export) ──
@@ -932,10 +933,10 @@ function buildCharacterColorPanel() {
     const row = document.createElement('div');
     row.className = 'char-color-row';
     row.innerHTML = `
-      <input type="text" data-id="${id}" data-field="icon" value="${existing.icon}" style="width:32px;text-align:center;" title="图标">
-      <input type="color" data-id="${id}" data-field="gradientStart" value="${existing.gradientStart}" title="渐变起色">
-      <input type="color" data-id="${id}" data-field="gradientEnd" value="${existing.gradientEnd}" title="渐变止色">
-      <input type="text" data-id="${id}" data-field="label" value="${existing.label}" placeholder="标签" title="标签文字">
+      <input type="text" data-id="${id}" data-field="icon" value="${existing.icon}" style="width:32px;text-align:center;" title="${t('charIconTitle')}">
+      <input type="color" data-id="${id}" data-field="gradientStart" value="${existing.gradientStart}" title="${t('charGradStart')}">
+      <input type="color" data-id="${id}" data-field="gradientEnd" value="${existing.gradientEnd}" title="${t('charGradEnd')}">
+      <input type="text" data-id="${id}" data-field="label" value="${existing.label}" placeholder="${t('charLabelPlaceholder')}" title="${t('charLabelTitle')}">
     `;
     row.querySelectorAll('input').forEach(input => {
       input.addEventListener('input', () => {
