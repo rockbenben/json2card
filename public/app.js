@@ -25,6 +25,8 @@ let currentConfig = {
   styleParams: { ...STYLE_DEFAULTS },
   watermark: '',
   coverExcludeRoles: ['Moderator'],
+  brandBg: '',    // brand theme: solid background for every card (empty = per-speaker colors)
+  brandText: '',  // brand theme: text color
 };
 let availableFonts = [];
 let rawJson = null; // unparsed original JSON (before normalization)
@@ -359,6 +361,7 @@ function bindEvents() {
     updatePreview();
   });
   $('#watermark').addEventListener('input', () => { currentConfig.watermark = $('#watermark').value; updatePreview(); });
+  setupBrandTheme();
   // Font pairing
   $('#fontPairing').addEventListener('change', () => {
     const pair = FONT_PAIRINGS[$('#fontPairing').value];
@@ -911,6 +914,59 @@ function getColorForMsg(msg, charIndex = -1) {
   return { ...merged, displayLabel: `${merged.icon} ${merged.label}` };
 }
 
+// ── Brand theme (solid-color mode) ──
+const BRAND_PRESETS = [
+  { name: 'Ink',    bg: '#14110b', text: '#ece3d0' },
+  { name: 'Paper',  bg: '#faf7f0', text: '#2d2a26' },
+  { name: 'Slate',  bg: '#1e293b', text: '#e2e8f0' },
+  { name: 'Blue',   bg: '#1d4ed8', text: '#eff6ff' },
+  { name: 'Sand',   bg: '#e7dfce', text: '#3a3226' },
+  { name: 'Forest', bg: '#14312a', text: '#dcefe6' },
+];
+
+function applyBrandToConfig() {
+  const on = $('#brandEnable').checked;
+  $('#brandControls').style.display = on ? 'block' : 'none';
+  currentConfig.brandBg = on ? $('#brandBgColor').value : '';
+  currentConfig.brandText = on ? $('#brandTextColor').value : '';
+  updatePreview();
+}
+
+/** Reflect currentConfig.brand* into the brand UI (e.g. after loading history). */
+function syncBrandUI() {
+  const on = !!currentConfig.brandBg;
+  $('#brandEnable').checked = on;
+  if (on) {
+    $('#brandBgColor').value = currentConfig.brandBg;
+    if (currentConfig.brandText) $('#brandTextColor').value = currentConfig.brandText;
+  }
+  $('#brandControls').style.display = on ? 'block' : 'none';
+}
+
+function setupBrandTheme() {
+  const wrap = $('#brandPresets');
+  BRAND_PRESETS.forEach(pre => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'brand-chip';
+    chip.title = pre.name;
+    chip.textContent = 'Aa';
+    chip.style.background = pre.bg;
+    chip.style.color = pre.text;
+    chip.addEventListener('click', () => {
+      $('#brandBgColor').value = pre.bg;
+      $('#brandTextColor').value = pre.text;
+      $('#brandEnable').checked = true;
+      applyBrandToConfig();
+    });
+    wrap.appendChild(chip);
+  });
+  $('#brandEnable').addEventListener('change', applyBrandToConfig);
+  $('#brandBgColor').addEventListener('input', () => { if ($('#brandEnable').checked) applyBrandToConfig(); });
+  $('#brandTextColor').addEventListener('input', () => { if ($('#brandEnable').checked) applyBrandToConfig(); });
+  $('#brandControls').style.display = 'none';
+}
+
 let _fitTimer = null;  // debounce handle for the preview auto-fit pass
 function updatePreview() {
   if (!currentData?.messages) { clearPreview(); return; }
@@ -986,23 +1042,25 @@ function createCardPreview(card, index, total, aspect, rawMsg = {}) {
 
   const el = document.createElement('div');
   const p = currentConfig.styleParams || STYLE_DEFAULTS;
-  const start = p.gradientReverse ? card.gradientEnd : card.gradientStart;
-  const end = p.gradientReverse ? card.gradientStart : card.gradientEnd;
+  const brandBg = currentConfig.brandBg || '';  // solid brand background overrides gradient
+  const start = brandBg || (p.gradientReverse ? card.gradientEnd : card.gradientStart);
+  const end = brandBg || (p.gradientReverse ? card.gradientStart : card.gradientEnd);
+  const tc = brandBg ? (currentConfig.brandText || card.textColor) : card.textColor;
   el.className = 'card-preview';
   el.style.aspectRatio = aspect;
-  el.style.color = card.textColor;
+  el.style.color = tc;
   el.style.background = `linear-gradient(${p.gradientAngle}deg, ${start}, ${end})`;
   el.style.borderRadius = `${p.borderRadius / 2.5}px`;
 
   // Cover plate — same builder as the export (generate.mjs), scaled down
   if (card._cover) {
-    el.style.color = card.textColor;
+    el.style.color = tc;
     el.innerHTML = CardRules.coverPlateHTML({
       kicker: card._coverKicker,
       title: escapeHtml(card._coverTitle),
       summary: escapeHtml(card._coverSummary),
       names: escapeHtml(card._coverNames),
-      textColor: card.textColor,
+      textColor: tc,
       bodyFont: currentConfig.bodyFont || "'Noto Serif SC'",
       labelFont: currentConfig.labelFont,
       scale: 0.4,
@@ -1173,6 +1231,7 @@ function loadHistory() {
       $('#cardSize').value = currentConfig.cardSize;
       if (currentConfig.cardStyle) $('#cardStyleSelect').value = currentConfig.cardStyle;
       if (currentConfig.styleParams) syncStyleParamsToUI();
+      syncBrandUI();
 
       syncMappingToUI();
       populateSlotDropdowns();

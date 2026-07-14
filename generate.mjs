@@ -101,6 +101,9 @@ const DEFAULT_CONFIG = {
   colorOverrides: {}, slots: { ...DEFAULT_SLOTS },
   cardStyle: 'classic', styleParams: { ...STYLE_DEFAULTS },
   watermark: '', coverExcludeRoles: ['Moderator'],
+  // Brand theme: when brandBg is set, every card (incl. cover) uses this solid
+  // background + text color instead of per-speaker gradients. Empty = off.
+  brandBg: '', brandText: '',
 };
 
 // ── Helpers ──
@@ -150,18 +153,20 @@ export function resolveSlot(source, card, rawMsg = {}) {
 
 function buildCardCSS(card, config) {
   const p = { ...STYLE_DEFAULTS, ...config.styleParams };
-  const gradStart = p.gradientReverse ? card.gradientEnd : card.gradientStart;
-  const gradEnd = p.gradientReverse ? card.gradientStart : card.gradientEnd;
+  const brand = config.brandBg || '';  // solid brand background overrides gradient
+  const tc = config.brandText || card.textColor;
+  const gradStart = brand || (p.gradientReverse ? card.gradientEnd : card.gradientStart);
+  const gradEnd = brand || (p.gradientReverse ? card.gradientStart : card.gradientEnd);
   const centered = p.textAlign === 'center';
   return `
-    .card { background: linear-gradient(${p.gradientAngle}deg, ${gradStart}, ${gradEnd}); border-radius: ${p.borderRadius}px; }
+    .card { background: linear-gradient(${p.gradientAngle}deg, ${gradStart}, ${gradEnd}); border-radius: ${p.borderRadius}px; color: ${tc}; }
     .noise { opacity: ${p.noiseOpacity / 100}; }
     .glow-tr { background: radial-gradient(circle, rgba(255,255,255,${p.glowIntensity / 100}) 0%, transparent 70%); }
     .glow-bl { background: radial-gradient(circle, rgba(255,255,255,${p.glowIntensity / 200}) 0%, transparent 70%); }
     ${centered ? '.pill { align-self: center; } .pill::before { display: none; }' : ''}
     .content p { text-align: ${p.textAlign}; line-height: ${p.lineHeight}; letter-spacing: ${p.letterSpacing}px; }
     ${centered ? '.footer { justify-content: center; gap: 24px; }' : ''}
-    ${p.showQuoteMark ? `.deco { display: block; position: absolute; top: 40px; ${centered ? 'left: 50%; transform: translateX(-50%);' : 'left: 68px;'} font-size: 150px; opacity: 0.07; color: ${card.textColor}; line-height: 1; z-index: 0; } .deco::before { content: "\\201C"; }` : ''}
+    ${p.showQuoteMark ? `.deco { display: block; position: absolute; top: 40px; ${centered ? 'left: 50%; transform: translateX(-50%);' : 'left: 68px;'} font-size: 150px; opacity: 0.07; color: ${tc}; line-height: 1; z-index: 0; } .deco::before { content: "\\201C"; }` : ''}
   `;
 }
 
@@ -169,7 +174,7 @@ function buildCardData(card, config, rawMsg = {}) {
   const slots = config.slots || DEFAULT_SLOTS;
   return {
     styleCSS: buildCardCSS(card, config),
-    textColor: card.textColor,
+    textColor: config.brandText || card.textColor,
     badge: resolveSlot(slots.badge, card, rawMsg),
     bodyHtml: card._isHtml ? card.content : contentToHtml(resolveSlot(slots.body, card, rawMsg)),
     footerLeft: resolveSlot(slots.footerLeft, card, rawMsg),
@@ -211,7 +216,7 @@ function buildCoverCard(data, config) {
       title: escapeHtml(config.coverTitle || ''),
       summary: escapeHtml(summary),
       names: escapeHtml(names),
-      textColor: '#f0e6d2',
+      textColor: config.brandText || '#f0e6d2',
       bodyFont: config.bodyFont || "'Noto Serif SC'",
       labelFont: config.labelFont,
       scale: 1,

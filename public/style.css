@@ -404,6 +404,21 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   font-size: 12px;
 }
 
+/* ── Brand theme ── */
+.brand-block { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px dashed var(--rule); }
+.brand-head { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--paper-dim); cursor: pointer; margin-bottom: 10px; }
+.brand-head input { accent-color: var(--cyan); width: 14px; height: 14px; }
+.brand-controls label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; color: var(--paper-dim); }
+.brand-controls input[type="color"] { width: 46px; height: 26px; border: 1px solid var(--rule); border-radius: 0; background: transparent; padding: 2px; cursor: pointer; }
+.brand-presets { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.brand-chip {
+  width: 34px; height: 30px; border: 1px solid var(--rule-2); border-radius: 0;
+  font-family: var(--mono); font-size: 12px; font-weight: 600; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: transform .1s, border-color .1s;
+}
+.brand-chip:hover { transform: translateY(-1px); border-color: var(--cyan); }
+
 /* ── History ── */
 .history-section { flex: 1; }
 .history-section h2 { display: flex; align-items: center; }
@@ -574,8 +589,8 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .card-preview .pill-preview {
   position: relative;
   align-self: flex-start;
-  background: rgba(255,255,255,0.13);
-  border: 1px solid rgba(255,255,255,0.16);
+  background: color-mix(in srgb, currentColor 13%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
   border-radius: 8px;
   padding: 6px 14px 6px 18px;
   font-size: 13px;
@@ -635,7 +650,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.06) 68%, rgba(255,255,255,0) 100%);
+  background: linear-gradient(90deg, color-mix(in srgb, currentColor 30%, transparent) 0%, color-mix(in srgb, currentColor 8%, transparent) 68%, transparent 100%);
 }
 
 /* ============================================================

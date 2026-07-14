@@ -96,6 +96,17 @@
 
       <section class="config-section">
         <h2 data-i18n="config"></h2>
+        <div class="brand-block">
+          <label class="brand-head">
+            <input type="checkbox" id="brandEnable">
+            <span data-i18n="brandTheme"></span>
+          </label>
+          <div id="brandControls" class="brand-controls">
+            <div class="brand-presets" id="brandPresets"></div>
+            <label><span data-i18n="brandBg"></span> <input type="color" id="brandBgColor" value="#1e293b"></label>
+            <label><span data-i18n="brandText"></span> <input type="color" id="brandTextColor" value="#e2e8f0"></label>
+          </div>
+        </div>
         <label><span data-i18n="coverTitle"></span> <input type="text" id="coverTitle" value="圆桌论道"></label>
         <label><span data-i18n="coverExcludeRoles"></span> <input type="text" id="coverExcludeRoles" data-i18n-placeholder="coverExcludeRolesPlaceholder"></label>
         <label><span data-i18n="watermark"></span> <input type="text" id="watermark" data-i18n-placeholder="watermarkPlaceholder"></label>
