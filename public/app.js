@@ -140,6 +140,7 @@ function applyI18n() {
       if (styleMap[opt.value]) opt.textContent = t(styleMap[opt.value]);
     }
   }
+  renderStyleGallery();
 
   // Re-populate preset dropdown
   const presetMap = { roundtable: 'presetRoundtable', quote: 'presetQuote', note: 'presetNote', news: 'presetNews' };
@@ -221,6 +222,7 @@ async function loadServerConfig() {
     sSel.innerHTML = Object.entries(CARD_STYLES).map(([k, v]) =>
       `<option value="${k}" ${k === 'classic' ? 'selected' : ''}>${t(styleI18n[k] || k)}</option>`
     ).join('');
+    renderStyleGallery();  // now that CARD_STYLES has params, render distinct swatches
 
     // Populate card sizes (labels translated via applyI18n)
     const sizeI18n = { '3:4': 'size34', '1:1': 'size11', '4:3': 'size43', '9:16': 'size916', '16:9': 'size169' };
@@ -386,6 +388,7 @@ function bindEvents() {
       if (PRESETS[key].cardStyle) {
         currentConfig.cardStyle = PRESETS[key].cardStyle;
         $('#cardStyleSelect').value = currentConfig.cardStyle;
+        setActiveStyleChip(currentConfig.cardStyle);
         const style = CARD_STYLES[currentConfig.cardStyle];
         if (style?.params) {
           currentConfig.styleParams = { ...STYLE_DEFAULTS, ...style.params };
@@ -427,6 +430,7 @@ function bindEvents() {
   $('#cardStyleSelect').addEventListener('change', () => {
     const val = $('#cardStyleSelect').value;
     currentConfig.cardStyle = val;
+    setActiveStyleChip(val);
     if (val.startsWith('custom:')) {
       const customs = JSON.parse(localStorage.getItem('customPresets') || '{}');
       const params = customs[val.slice(7)];
@@ -1010,6 +1014,50 @@ function setupBrandTheme() {
   $('#brandControls').style.display = 'none';
 }
 
+// ── Style preset gallery (visual picker for the built-in card styles) ──
+const STYLE_I18N = { classic: 'styleClassic', gentle: 'styleGentle', texture: 'styleTexture', quote: 'styleQuote', magazine: 'styleMagazine', elegant: 'styleElegant' };
+
+function setActiveStyleChip(key) {
+  document.querySelectorAll('#styleGallery .style-chip').forEach(c =>
+    c.classList.toggle('active', c.dataset.style === key));
+}
+
+const _SW_NOISE = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
+
+function renderStyleGallery() {
+  const gal = $('#styleGallery');
+  if (!gal) return;
+  // Each chip is a real mini-card with the style actually applied — radius,
+  // gradient direction, grain (noise), glow, text-align and quote mark — so the
+  // six presets are obviously distinct at a glance.
+  gal.innerHTML = Object.entries(CARD_STYLES).map(([k, v]) => {
+    const p = { ...STYLE_DEFAULTS, ...(v.params || {}) };
+    const r = Math.round((p.borderRadius ?? 40) * 0.42);
+    const [g1, g2] = p.gradientReverse ? ['#a0604a', '#c4836e'] : ['#c4836e', '#a0604a'];
+    const noise = Math.min(0.5, (p.noiseOpacity ?? 5) / 100 * 4.5).toFixed(2);
+    const glow = Math.min(0.6, (p.glowIntensity ?? 0) / 100 * 3.2).toFixed(2);
+    const center = p.textAlign === 'center' ? ' c' : '';
+    const q = p.showQuoteMark ? '<span class="sm-q">“</span>' : '';
+    return `<button type="button" class="style-chip" data-style="${k}" title="${t(STYLE_I18N[k] || k)}">
+      <span class="style-mini" style="border-radius:${r}px;background:linear-gradient(${p.gradientAngle ?? 135}deg,${g1},${g2})">
+        <span class="sm-grain" style="opacity:${noise};background-image:${_SW_NOISE}"></span>
+        <span class="sm-glow" style="opacity:${glow}"></span>${q}
+        <span class="sm-body${center}"><span class="sm-pill"></span><span class="sm-line" style="width:82%"></span><span class="sm-line" style="width:58%"></span></span>
+      </span>
+      <span class="style-name">${t(STYLE_I18N[k] || k)}</span>
+    </button>`;
+  }).join('');
+  gal.querySelectorAll('.style-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const sel = $('#cardStyleSelect');
+      sel.value = chip.dataset.style;
+      sel.dispatchEvent(new Event('change'));
+      setActiveStyleChip(chip.dataset.style);
+    });
+  });
+  setActiveStyleChip(currentConfig.cardStyle || 'classic');
+}
+
 let _fitTimer = null;  // debounce handle for the preview auto-fit pass
 function updatePreview() {
   if (!currentData?.messages) { clearPreview(); return; }
@@ -1276,7 +1324,7 @@ function loadHistory() {
       $('#fontSize').value = currentConfig.fontSize;
       $('#fontSizeValue').textContent = `${currentConfig.fontSize}px`;
       $('#cardSize').value = currentConfig.cardSize;
-      if (currentConfig.cardStyle) $('#cardStyleSelect').value = currentConfig.cardStyle;
+      if (currentConfig.cardStyle) { $('#cardStyleSelect').value = currentConfig.cardStyle; setActiveStyleChip(currentConfig.cardStyle); }
       if (currentConfig.styleParams) syncStyleParamsToUI();
       syncBrandUI();
       restoreCustomFonts();
