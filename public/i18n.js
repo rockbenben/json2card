@@ -217,7 +217,41 @@ const LANG = {
   }
 };
 
-let currentLang = localStorage.getItem('lang') || (navigator.language.startsWith('zh') ? 'zh' : 'en');
+// Supported UI languages (native names). Missing keys fall back to English.
+const LANGUAGES = [
+  { code: 'zh', name: '中文',              dir: 'ltr' },
+  { code: 'en', name: 'English',           dir: 'ltr' },
+  { code: 'ja', name: '日本語',            dir: 'ltr' },
+  { code: 'ko', name: '한국어',            dir: 'ltr' },
+  { code: 'es', name: 'Español',           dir: 'ltr' },
+  { code: 'pt', name: 'Português',         dir: 'ltr' },
+  { code: 'fr', name: 'Français',          dir: 'ltr' },
+  { code: 'de', name: 'Deutsch',           dir: 'ltr' },
+  { code: 'it', name: 'Italiano',          dir: 'ltr' },
+  { code: 'ru', name: 'Русский',           dir: 'ltr' },
+  { code: 'ar', name: 'العربية',           dir: 'rtl' },
+  { code: 'hi', name: 'हिन्दी',              dir: 'ltr' },
+  { code: 'tr', name: 'Türkçe',            dir: 'ltr' },
+  { code: 'vi', name: 'Tiếng Việt',        dir: 'ltr' },
+  { code: 'id', name: 'Bahasa Indonesia',  dir: 'ltr' },
+  { code: 'th', name: 'ไทย',               dir: 'ltr' },
+  { code: 'pl', name: 'Polski',            dir: 'ltr' },
+  { code: 'nl', name: 'Nederlands',        dir: 'ltr' },
+];
+const LANG_CODES = LANGUAGES.map(l => l.code);
+
+function detectLang() {
+  const saved = localStorage.getItem('lang');
+  if (saved && LANG_CODES.includes(saved)) return saved;
+  const nav = (navigator.language || 'en').toLowerCase();
+  return LANG_CODES.find(c => nav === c || nav.startsWith(c + '-')) || 'en';
+}
+
+let currentLang = detectLang();
+
+function langDir(lang = currentLang) {
+  return (LANGUAGES.find(l => l.code === lang) || {}).dir || 'ltr';
+}
 
 function t(key, params = {}) {
   let s = LANG[currentLang]?.[key] || LANG.en[key] || key;
@@ -228,4 +262,6 @@ function t(key, params = {}) {
 function setLang(lang) {
   currentLang = lang;
   localStorage.setItem('lang', lang);
+  document.documentElement.setAttribute('lang', lang);
+  document.documentElement.setAttribute('dir', langDir(lang));
 }

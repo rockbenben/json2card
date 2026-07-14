@@ -120,7 +120,7 @@ function applyI18n() {
     el.placeholder = t(el.dataset.i18nPlaceholder);
   });
   document.title = t('title');
-  $('#langToggle').textContent = currentLang === 'zh' ? 'EN' : '中文';
+  $('#langSelect').value = currentLang;
 
   // Set language-aware defaults (only if not already customized by user)
   if (!currentConfig.coverTitle) {
@@ -353,9 +353,14 @@ function handleFontUpload(e) {
 // ── Events ──
 
 function bindEvents() {
-  // Language toggle
-  $('#langToggle').addEventListener('click', () => {
-    setLang(currentLang === 'zh' ? 'en' : 'zh');
+  // Language picker (18 languages; missing keys fall back to English)
+  const langSel = $('#langSelect');
+  langSel.innerHTML = LANGUAGES.map(l => `<option value="${l.code}">${l.name}</option>`).join('');
+  langSel.value = currentLang;
+  document.documentElement.setAttribute('lang', currentLang);
+  document.documentElement.setAttribute('dir', langDir(currentLang));
+  langSel.addEventListener('change', () => {
+    setLang(langSel.value);
     applyI18n();
     if (currentData) updatePreview();
   });
