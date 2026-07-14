@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 🚚 Check out the repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -52,6 +52,7 @@ jobs:
           images: |
             ${{ vars.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}
             ghcr.io/${{ env.GH_OWNER_LC }}/${{ env.IMAGE_NAME }}
+          # 版本号取自 release 的 git tag（refs/tags/*）；手动触发无 tag 时仅打 latest
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
