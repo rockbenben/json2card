@@ -79,7 +79,7 @@ app.post('/api/fonts/refresh', async (req, res) => {
 
 // POST /api/generate-long — render all cards as one vertical long image
 app.post('/api/generate-long', rateLimit(), async (req, res) => {
-  const { data, config = {} } = req.body;
+  const { data, config = {} } = req.body || {};  // Express 5: req.body is undefined for empty/non-JSON bodies
   if (!data?.messages) return res.status(400).json({ error: 'Missing data.messages' });
   try {
     const results = await renderCardsFromData(data, config, TEMPLATE_PATH, FONTS_DIR, await getBrowser());
@@ -103,7 +103,7 @@ app.post('/api/generate-long', rateLimit(), async (req, res) => {
 });
 
 app.post('/api/generate', rateLimit(), async (req, res) => {
-  const { data, config = {} } = req.body;
+  const { data, config = {} } = req.body || {};  // Express 5: req.body is undefined for empty/non-JSON bodies
   if (!data?.messages) return res.status(400).json({ error: 'Missing data.messages' });
   try {
     const results = await renderCardsFromData(data, config, TEMPLATE_PATH, FONTS_DIR, await getBrowser());
