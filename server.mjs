@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import express from 'express';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import puppeteer from 'puppeteer';
 import { renderCardsFromData, USER_STYLE, COLOR_PALETTE, CHAR_ICONS, FIXED_ICONS, HIDDEN_ROLES, CARD_SIZES, CARD_STYLES, STYLE_DEFAULTS, DEFAULT_SLOTS, PRESETS } from './generate.mjs';
 import { scanFonts } from './fonts.mjs';
@@ -13,7 +13,7 @@ const FONTS_DIR = path.join(__dirname, 'fonts');
 
 let browser = null;
 async function getBrowser() {
-  if (!browser || !browser.isConnected()) {
+  if (!browser || !browser.connected) {
     browser = await puppeteer.launch({
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--allow-file-access-from-files'],
     });
@@ -109,7 +109,7 @@ app.post('/api/generate', rateLimit(), async (req, res) => {
     const results = await renderCardsFromData(data, config, TEMPLATE_PATH, FONTS_DIR, await getBrowser());
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', 'attachment; filename="cards.zip"');
-    const archive = archiver('zip', { zlib: { level: 5 } });
+    const archive = new ZipArchive({ zlib: { level: 5 } });
     archive.pipe(res);
     for (const { filename, buffer } of results) archive.append(buffer, { name: filename });
     await archive.finalize();

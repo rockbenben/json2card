@@ -1,6 +1,6 @@
 {
   "name": "json2card",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Turn any JSON into beautiful shareable cards.",
   "license": "MIT",
   "engines": {
@@ -14,9 +14,9 @@
     "test": "node --test test-cards.mjs"
   },
   "dependencies": {
-    "archiver": "^7.0.1",
-    "express": "^4.22.1",
-    "puppeteer": "^24.0.0",
-    "remove-markdown": "^0.6.3"
+    "archiver": "^8.0.0",
+    "express": "^5.2.1",
+    "puppeteer": "^25.3.0",
+    "remove-markdown": "^0.6.4"
   }
 }
