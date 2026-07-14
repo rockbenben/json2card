@@ -911,6 +911,7 @@ function getColorForMsg(msg, charIndex = -1) {
   return { ...merged, displayLabel: `${merged.icon} ${merged.label}` };
 }
 
+let _fitTimer = null;  // debounce handle for the preview auto-fit pass
 function updatePreview() {
   if (!currentData?.messages) { clearPreview(); return; }
 
@@ -918,26 +919,19 @@ function updatePreview() {
   const aspect = getAspect(currentConfig.cardSize || '3:4');
   container.innerHTML = '';
 
-  // Cover card — a title plate, mirroring buildCoverCard() in generate.mjs
-  const excludeSet = new Set((currentConfig.coverExcludeRoles || []).map(r => r.toLowerCase()));
-  const coverNames = (currentData.characters || [])
-    .filter(id => !excludeSet.has(id.toLowerCase()))
-    .map(id => currentConfig.colorOverrides[id]?.name || id)
-    .join('  ·  ');
-  const userMsg = currentData.messages.find(m => m.role === 'user');
-  const coverParas = userMsg ? String(userMsg.content).split(/\n+/).filter(l => l.trim()) : [];
-  const coverSummary = coverParas.filter(p => p.length >= 10).sort((a, b) => a.length - b.length)[0] || coverParas[0] || '';
+  // Cover card — a title plate; data + markup shared with the export via CardRules
+  const cover = CardRules.coverData(currentData.messages, currentData.characters, currentConfig);
+  const coverTitle = currentConfig.coverTitle || t('defaultCoverTitle');
   const coverEl = createCardPreview({
-    label: currentConfig.coverTitle || t('defaultCoverTitle'),
     gradientStart: '#0c0c0c',
     gradientEnd: '#1a1a1a',
     textColor: '#f0e6d2',
     _cover: true,
-    _coverTitle: currentConfig.coverTitle || t('defaultCoverTitle'),
-    _coverSummary: coverSummary,
-    _coverNames: coverNames,
-    _voiceCount: (currentData.characters || []).filter(id => !excludeSet.has(id.toLowerCase())).length,
-    name: currentConfig.coverTitle || t('defaultCoverTitle'),
+    _coverTitle: coverTitle,
+    _coverSummary: cover.summary,
+    _coverNames: cover.names,
+    _coverKicker: cover.kicker,
+    name: coverTitle,
   }, 1, currentData.messages.length + 1, aspect);
   container.appendChild(coverEl);
 
@@ -955,15 +949,17 @@ function updatePreview() {
   $('#exportBtn').disabled = false;
   $('#exportLongBtn').disabled = false;
 
-  // Auto-fit preview bodies to mirror the exported cards (short → larger type),
-  // using the same CardRules.autoFitFontSize as the export.
-  requestAnimationFrame(() => {
-    container.querySelectorAll('.card-preview').forEach(cardEl => {
+  // Auto-fit preview bodies to mirror the export (short → larger type). Debounced:
+  // autoFitFontSize forces reflows, and updatePreview reruns on every slider tick,
+  // so coalesce to one pass after dragging settles to keep the editor smooth.
+  clearTimeout(_fitTimer);
+  _fitTimer = setTimeout(() => {
+    document.querySelectorAll('#previewCards .card-preview').forEach(cardEl => {
       const cp = cardEl.querySelector('.content-preview');
       const inner = cardEl.querySelector('.cp-inner');
       if (cp && inner && window.CardRules) CardRules.autoFitFontSize(inner, cp);
     });
-  });
+  }, 80);
 }
 
 function resolveSlotClient(source, card, rawMsg = {}) {
@@ -1002,7 +998,7 @@ function createCardPreview(card, index, total, aspect, rawMsg = {}) {
   if (card._cover) {
     el.style.color = card.textColor;
     el.innerHTML = CardRules.coverPlateHTML({
-      kicker: card._voiceCount ? `${card._voiceCount} · VOICES` : 'PROOF',
+      kicker: card._coverKicker,
       title: escapeHtml(card._coverTitle),
       summary: escapeHtml(card._coverSummary),
       names: escapeHtml(card._coverNames),

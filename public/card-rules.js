@@ -102,7 +102,42 @@ const CardRules = (() => {
 </div>`;
   }
 
-  return { buildCardList, autoFitFontSize, coverPlateHTML, AUTOFIT };
+  /**
+   * Derive the cover plate's data (summary line, roster, voice count, kicker)
+   * from messages — single source of truth for BOTH export (generate.mjs) and
+   * the web preview, so they never render a different title/summary/kicker.
+   */
+  function coverData(messages, characters, config) {
+    const c = config || {};
+    const userMsg = (messages || []).find(m => m.role === 'user');
+    const paras = userMsg ? String(userMsg.content).split(/\n+/).filter(l => l.trim()) : [];
+    const summary = paras.filter(p => p.length >= 10).sort((a, b) => a.length - b.length)[0] || paras[0] || '';
+    const excludeSet = new Set((c.coverExcludeRoles || []).map(r => String(r).toLowerCase()));
+    const overrides = c.colorOverrides || {};
+    const kept = (characters || []).filter(id => !excludeSet.has(String(id).toLowerCase()));
+    const names = kept.map(id => overrides[id]?.name || id).join('  ·  ');
+    const voiceCount = kept.length;
+    return { summary, names, voiceCount, kicker: voiceCount ? `${voiceCount} · VOICES` : 'PROOF' };
+  }
+
+  /**
+   * Ensure `.content` holds exactly one clean `.content-inner`, clearing any
+   * leftover cover node from a warm page and any prior auto-fit scale. DOM-only;
+   * shared by both page.evaluate contexts in generate.mjs. Returns the wrapper.
+   */
+  function resetContentInner(box) {
+    let inner = box.querySelector('.content-inner');
+    if (!inner || box.children.length > 1) {
+      box.innerHTML = '';
+      inner = document.createElement('div');
+      inner.className = 'content-inner';
+      box.appendChild(inner);
+    }
+    inner.style.fontSize = '';
+    return inner;
+  }
+
+  return { buildCardList, autoFitFontSize, coverPlateHTML, coverData, resetContentInner, AUTOFIT };
 })();
 
 // Browser: expose as a window global so Puppeteer-injected pages and app.js

@@ -201,23 +201,13 @@ function buildHtml(template, card, config, fontFaceCSS, rawMsg = {}) {
 }
 
 function buildCoverCard(data, config) {
-  const userMsg = data.messages.find(m => m.role === 'user');
-  const paras = userMsg ? userMsg.content.split(/\n+/).filter(l => l.trim()) : [];
-  const summary = paras.filter(p => p.length >= 10).sort((a, b) => a.length - b.length)[0] || paras[0] || '';
-  const excludeSet = new Set((config.coverExcludeRoles || []).map(r => r.toLowerCase()));
-  const names = (data.characters || [])
-    .filter(id => !excludeSet.has(id.toLowerCase()))
-    .map(id => config.colorOverrides[id]?.name || id)
-    .join('  ·  ');
-
-  const voiceCount = (data.characters || []).filter(id => !excludeSet.has(id.toLowerCase())).length;
-
+  const { summary, names, kicker } = CardRules.coverData(data.messages, data.characters, config);
   return {
     gradientStart: '#0c0c0c', gradientEnd: '#1a1a1a', textColor: '#f0e6d2',
     label: '', name: '封面', suffix: '', _isHtml: true,
     // Title plate — the first slide viewers see. Shared with the web preview.
     content: CardRules.coverPlateHTML({
-      kicker: voiceCount ? `${voiceCount} · VOICES` : 'PROOF',
+      kicker,
       title: escapeHtml(config.coverTitle || ''),
       summary: escapeHtml(summary),
       names: escapeHtml(names),
@@ -264,11 +254,7 @@ async function splitByRendering(page, colorConfig, content, config) {
     document.querySelector('.watermark').style.color = tc;
 
     const box = document.querySelector('.content');
-    let el = box.querySelector('.content-inner');
-    if (!el || box.children.length > 1) {  // clear a leftover cover node (warm page)
-      box.innerHTML = ''; el = document.createElement('div'); el.className = 'content-inner'; box.appendChild(el);
-    }
-    el.style.fontSize = '';  // clear any auto-fit scale left by a prior render (warm page)
+    const el = window.CardRules.resetContentInner(box);  // clean wrapper (clears leftover cover / auto-fit scale)
     // Measure the inner wrapper's natural height (unaffected by the flex
     // centering on .content) against the available box height.
     function fits(html) { el.innerHTML = html; return el.scrollHeight <= box.clientHeight; }
@@ -447,18 +433,11 @@ export async function renderCardsFromData(data, config = {}, templatePath, fonts
           // the min-height:100% .content-inner collapses that layout.
           box.innerHTML = u.bodyHtml;
         } else {
-          // Ensure .content holds exactly one .content-inner — a prior cover set
-          // box.innerHTML directly, so any leftover node must be cleared first.
-          let inner = box.querySelector('.content-inner');
-          if (!inner || box.children.length > 1) {
-            box.innerHTML = '';
-            inner = document.createElement('div'); inner.className = 'content-inner'; box.appendChild(inner);
-          }
+          const inner = window.CardRules.resetContentInner(box);  // clean wrapper (see card-rules.js)
           inner.innerHTML = u.bodyHtml;
           document.querySelectorAll('.content p').forEach(p => { p.style.color = tc; });
-          inner.style.fontSize = '';  // clear any warm-page auto-fit leftover
           // Short single-page bodies grow to fill the frame; dense/paginated keep size.
-          if (u.autoFit && window.CardRules) window.CardRules.autoFitFontSize(inner, box);
+          if (u.autoFit) window.CardRules.autoFitFontSize(inner, box);
         }
         document.querySelector('.footer-title').textContent = u.footerLeft;
         document.querySelector('.footer-title').style.color = tc;
