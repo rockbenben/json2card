@@ -155,10 +155,10 @@ function buildCardCSS(card, config) {
     .noise { opacity: ${p.noiseOpacity / 100}; }
     .glow-tr { background: radial-gradient(circle, rgba(255,255,255,${p.glowIntensity / 100}) 0%, transparent 70%); }
     .glow-bl { background: radial-gradient(circle, rgba(255,255,255,${p.glowIntensity / 200}) 0%, transparent 70%); }
-    ${centered ? '.pill { align-self: center; }' : ''}
+    ${centered ? '.pill { align-self: center; } .pill::before { display: none; }' : ''}
     .content p { text-align: ${p.textAlign}; line-height: ${p.lineHeight}; letter-spacing: ${p.letterSpacing}px; }
     ${centered ? '.footer { justify-content: center; gap: 24px; }' : ''}
-    ${p.showQuoteMark ? `.deco { display: block; position: absolute; top: 45px; left: 72px; font-size: 140px; opacity: 0.06; color: ${card.textColor}; line-height: 1; } .deco::before { content: "\\201C"; }` : ''}
+    ${p.showQuoteMark ? `.deco { display: block; position: absolute; top: 40px; ${centered ? 'left: 50%; transform: translateX(-50%);' : 'left: 68px;'} font-size: 150px; opacity: 0.07; color: ${card.textColor}; line-height: 1; z-index: 0; } .deco::before { content: "\\201C"; }` : ''}
   `;
 }
 
@@ -207,13 +207,28 @@ function buildCoverCard(data, config) {
     .map(id => config.colorOverrides[id]?.name || id)
     .join('  ·  ');
 
+  const bodyFont = config.bodyFont || "'Noto Serif SC'";
+  const voiceCount = (data.characters || []).filter(id => !excludeSet.has(id.toLowerCase())).length;
+
   return {
     gradientStart: '#0c0c0c', gradientEnd: '#1a1a1a', textColor: '#f0e6d2',
-    label: config.coverTitle, name: '封面', suffix: '', _isHtml: true,
-    content: `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;">
-  <p style="font-size:28px;line-height:2.2;opacity:0.8;letter-spacing:1px;margin:0;">${escapeHtml(summary)}</p>
-  <div style="width:40px;height:1px;background:currentColor;opacity:0.2;margin:48px 0;"></div>
-  <p style="font-size:22px;opacity:0.4;letter-spacing:4px;margin:0;">${escapeHtml(names)}</p>
+    label: '', name: '封面', suffix: '', _isHtml: true,
+    // Title plate — the first slide viewers see. A registration tick, the
+    // cover title as hero, a rule, one representative line, and the roster.
+    content: `<div style="height:100%;display:flex;flex-direction:column;color:#f0e6d2;">
+  <div style="display:flex;align-items:center;gap:16px;opacity:0.42;font-size:20px;letter-spacing:3px;">
+    <span style="display:inline-block;width:22px;height:22px;border:1.5px solid currentColor;border-radius:50%;position:relative;flex-shrink:0;">
+      <span style="position:absolute;left:50%;top:-6px;width:1.5px;height:34px;background:currentColor;transform:translateX(-50%);"></span>
+      <span style="position:absolute;top:50%;left:-6px;height:1.5px;width:34px;background:currentColor;transform:translateY(-50%);"></span>
+    </span>
+    <span>${voiceCount ? voiceCount + '&#8202;·&#8202;VOICES' : 'PROOF'}</span>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+    <div style="font-size:62px;line-height:1.24;letter-spacing:1px;font-weight:600;margin-bottom:40px;">${escapeHtml(config.coverTitle || '')}</div>
+    <div style="width:56px;height:2px;background:currentColor;opacity:0.35;margin-bottom:40px;"></div>
+    <div style="font-size:30px;line-height:1.95;opacity:0.74;font-family:${bodyFont},'Noto Serif SC',serif;">${escapeHtml(summary)}</div>
+  </div>
+  <div style="font-size:22px;line-height:1.7;letter-spacing:2px;opacity:0.5;">${escapeHtml(names)}</div>
 </div>`,
   };
 }
@@ -252,8 +267,13 @@ async function splitByRendering(page, colorConfig, content, config) {
     document.querySelector('.watermark').textContent = u.watermark;
     document.querySelector('.watermark').style.color = tc;
 
-    const el = document.querySelector('.content');
-    function fits(html) { el.innerHTML = html; return el.scrollHeight <= el.clientHeight; }
+    const box = document.querySelector('.content');
+    let el = box.querySelector('.content-inner');
+    if (!el) { el = document.createElement('div'); el.className = 'content-inner'; box.appendChild(el); }
+    el.style.fontSize = '';  // clear any auto-fit scale left by a prior render (warm page)
+    // Measure the inner wrapper's natural height (unaffected by the flex
+    // centering on .content) against the available box height.
+    function fits(html) { el.innerHTML = html; return el.scrollHeight <= box.clientHeight; }
 
     // All content fits → no split
     if (fits(ph.join('\n'))) return null;
@@ -389,6 +409,7 @@ export async function renderCardsFromData(data, config = {}, templatePath, fonts
         messageCards.push({
           ...card, label, displayLabel: dl, content: splitPages[i],
           suffix: splitPages.length === 1 ? '' : `-${i + 1}`,
+          _single: splitPages.length === 1,  // eligible for auto-fit (not paginated)
         });
       }
     }
@@ -400,13 +421,43 @@ export async function renderCardsFromData(data, config = {}, templatePath, fonts
     const results = [];
     for (const card of cards) {
       const d = buildCardData(card, cfg, card._rawMsg || {});
+      d.autoFit = !!card._single && !card._isHtml;  // scale up short, single-page bodies to fill the frame
       await page.evaluate((u) => {
         document.getElementById('card-css').textContent = u.styleCSS;
         const tc = u.textColor;
         document.querySelector('.pill').textContent = u.badge;
         document.querySelector('.pill').style.color = tc;
-        document.querySelector('.content').innerHTML = u.bodyHtml;
+        const box = document.querySelector('.content');
+        let inner = box.querySelector('.content-inner');
+        if (!inner) { inner = document.createElement('div'); inner.className = 'content-inner'; box.appendChild(inner); }
+        inner.innerHTML = u.bodyHtml;
         document.querySelectorAll('.content p').forEach(p => { p.style.color = tc; });
+        // Auto-fit: a brief quote stranded in a big (esp. tall) frame reads as a
+        // mistake. Grow the type toward a comfortable fill — more on tall cards,
+        // less on square — capped so it never shouts or clips. Dense cards and
+        // paginated pages keep the user's chosen size.
+        inner.style.fontSize = '';
+        if (u.autoFit) {
+          const boxH = box.clientHeight;
+          // Drop min-height so scrollHeight reports the NATURAL content height
+          // (the wrapper is otherwise forced to fill the box for centering).
+          inner.style.minHeight = '0';
+          const base = parseFloat(getComputedStyle(inner).fontSize) || 28;
+          if (inner.scrollHeight < boxH * 0.5) {
+            const maxFs = base * 2.2;
+            let fs = base;
+            while (fs < maxFs) {
+              const next = Math.min(fs + 2, maxFs);
+              inner.style.fontSize = next + 'px';
+              if (inner.scrollHeight > boxH * 0.62 || inner.scrollHeight > boxH - 8) {
+                if (inner.scrollHeight > boxH - 8) inner.style.fontSize = fs + 'px';
+                break;
+              }
+              fs = next;
+            }
+          }
+          inner.style.minHeight = '';  // restore fill so justify-center re-centers
+        }
         document.querySelector('.footer-title').textContent = u.footerLeft;
         document.querySelector('.footer-title').style.color = tc;
         const fr = document.querySelector('.footer-right');

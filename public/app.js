@@ -918,18 +918,26 @@ function updatePreview() {
   const aspect = getAspect(currentConfig.cardSize || '3:4');
   container.innerHTML = '';
 
-  // Cover card — filter excluded roles
+  // Cover card — a title plate, mirroring buildCoverCard() in generate.mjs
   const excludeSet = new Set((currentConfig.coverExcludeRoles || []).map(r => r.toLowerCase()));
   const coverNames = (currentData.characters || [])
     .filter(id => !excludeSet.has(id.toLowerCase()))
     .map(id => currentConfig.colorOverrides[id]?.name || id)
     .join('  ·  ');
+  const userMsg = currentData.messages.find(m => m.role === 'user');
+  const coverParas = userMsg ? String(userMsg.content).split(/\n+/).filter(l => l.trim()) : [];
+  const coverSummary = coverParas.filter(p => p.length >= 10).sort((a, b) => a.length - b.length)[0] || coverParas[0] || '';
   const coverEl = createCardPreview({
     label: currentConfig.coverTitle || t('defaultCoverTitle'),
-    content: coverNames || '(封面)',
     gradientStart: '#0c0c0c',
     gradientEnd: '#1a1a1a',
     textColor: '#f0e6d2',
+    _cover: true,
+    _coverTitle: currentConfig.coverTitle || t('defaultCoverTitle'),
+    _coverSummary: coverSummary,
+    _coverNames: coverNames,
+    _voiceCount: (currentData.characters || []).filter(id => !excludeSet.has(id.toLowerCase())).length,
+    name: currentConfig.coverTitle || t('defaultCoverTitle'),
   }, 1, currentData.messages.length + 1, aspect);
   container.appendChild(coverEl);
 
@@ -941,9 +949,36 @@ function updatePreview() {
     container.appendChild(el);
   });
 
-  $('#cardCount').textContent = t('previewCount', { n: currentData.messages.length + 1 });
+  const n = currentData.messages.length + 1;
+  $('#cardCount').textContent = t('previewCount', { n });
+  $('#proofMeta').textContent = `${n} cards · ${currentConfig.cardSize || '3:4'}`;
   $('#exportBtn').disabled = false;
   $('#exportLongBtn').disabled = false;
+
+  // Auto-fit preview bodies to mirror the exported cards (short → larger type).
+  requestAnimationFrame(() => {
+    container.querySelectorAll('.card-preview').forEach(cardEl => {
+      const cp = cardEl.querySelector('.content-preview');
+      const inner = cardEl.querySelector('.cp-inner');
+      if (!cp || !inner) return;
+      cp.style.fontSize = '';
+      const boxH = cp.clientHeight;
+      const base = parseFloat(getComputedStyle(cp).fontSize) || 14;
+      if (inner.scrollHeight < boxH * 0.5) {
+        const maxFs = base * 2.2;
+        let fs = base;
+        while (fs < maxFs) {
+          const next = Math.min(fs + 1, maxFs);
+          cp.style.fontSize = next + 'px';
+          if (inner.scrollHeight > boxH * 0.62 || inner.scrollHeight > boxH - 4) {
+            if (inner.scrollHeight > boxH - 4) cp.style.fontSize = fs + 'px';
+            break;
+          }
+          fs = next;
+        }
+      }
+    });
+  });
 }
 
 function resolveSlotClient(source, card, rawMsg = {}) {
@@ -963,6 +998,11 @@ function resolveSlotClient(source, card, rawMsg = {}) {
 }
 
 function createCardPreview(card, index, total, aspect, rawMsg = {}) {
+  const cell = document.createElement('div');
+  cell.className = 'proof-cell';
+  const slugName = card.name || card.label || '';
+  cell.dataset.slug = `card-${String(index).padStart(2, '0')}${slugName ? '  ·  ' + slugName : ''}`;
+
   const el = document.createElement('div');
   const p = currentConfig.styleParams || STYLE_DEFAULTS;
   const start = p.gradientReverse ? card.gradientEnd : card.gradientStart;
@@ -972,6 +1012,29 @@ function createCardPreview(card, index, total, aspect, rawMsg = {}) {
   el.style.color = card.textColor;
   el.style.background = `linear-gradient(${p.gradientAngle}deg, ${start}, ${end})`;
   el.style.borderRadius = `${p.borderRadius / 2.5}px`;
+
+  // Cover plate — dedicated title-plate layout (mirrors buildCoverCard output)
+  if (card._cover) {
+    const bf = currentConfig.bodyFont || "'Noto Serif SC'";
+    el.style.color = card.textColor;
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;gap:7px;opacity:0.45;font-size:8.5px;letter-spacing:1.5px;font-family:var(--mono);text-transform:uppercase;">
+        <span style="position:relative;display:inline-block;width:9px;height:9px;border:1px solid currentColor;border-radius:50%;flex-shrink:0;">
+          <span style="position:absolute;left:50%;top:-3px;height:15px;width:1px;background:currentColor;transform:translateX(-50%);"></span>
+          <span style="position:absolute;top:50%;left:-3px;width:15px;height:1px;background:currentColor;transform:translateY(-50%);"></span>
+        </span>
+        <span>${card._voiceCount ? card._voiceCount + ' · Voices' : 'Proof'}</span>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+        <div style="font-size:24px;line-height:1.2;font-weight:600;letter-spacing:0.3px;font-family:${currentConfig.labelFont},sans-serif;margin-bottom:12px;">${escapeHtml(card._coverTitle)}</div>
+        <div style="width:26px;height:1.5px;background:currentColor;opacity:0.35;margin-bottom:12px;"></div>
+        <div style="font-size:12px;line-height:1.75;opacity:0.72;font-family:${bf},serif;">${escapeHtml(card._coverSummary)}</div>
+      </div>
+      <div style="font-size:10px;line-height:1.6;letter-spacing:1px;opacity:0.5;">${escapeHtml(card._coverNames)}</div>
+    `;
+    cell.appendChild(el);
+    return cell;
+  }
 
   const cardObj = { ...card, index, total };
   const slots = currentConfig.slots;
@@ -984,21 +1047,23 @@ function createCardPreview(card, index, total, aspect, rawMsg = {}) {
   const wm = escapeHtml(currentConfig.watermark || '');
 
   el.innerHTML = `
-    ${p.showQuoteMark ? `<span style="position:absolute;top:8px;left:20px;font-size:48px;opacity:0.08;line-height:1;">\u201C</span>` : ''}
-    ${badgeVal ? `<div class="pill-preview" style="${centered ? 'text-align:center;display:block;' : ''}font-family:${currentConfig.labelFont},sans-serif;">${escapeHtml(badgeVal)}</div>` : ''}
-    <div class="content-preview" style="text-align:${p.textAlign};line-height:${p.lineHeight};letter-spacing:${p.letterSpacing}px;font-family:${currentConfig.bodyFont},serif;">${escapeHtml(removeMarkdown(bodyText)).replace(/\n/g, '<br>')}</div>
+    ${p.showQuoteMark ? `<span style="position:absolute;top:6px;${centered ? 'left:50%;transform:translateX(-50%);' : 'left:20px;'}font-size:52px;opacity:0.09;line-height:1;z-index:0;">\u201C</span>` : ''}
+    ${badgeVal ? `<div class="pill-preview${centered ? ' centered' : ''}" style="font-family:${currentConfig.labelFont},sans-serif;">${escapeHtml(badgeVal)}</div>` : ''}
+    <div class="content-preview" style="text-align:${p.textAlign};line-height:${p.lineHeight};letter-spacing:${p.letterSpacing}px;font-family:${currentConfig.bodyFont},serif;"><span class="cp-inner">${escapeHtml(removeMarkdown(bodyText)).replace(/\n/g, '<br>')}</span></div>
     <div class="footer-preview" style="${centered ? 'justify-content:center;gap:12px;' : ''}">
       <span>${escapeHtml(flVal)}</span>
       <span>${escapeHtml(frVal)}</span>
     </div>
     ${wm ? `<span style="position:absolute;bottom:8px;right:12px;font-size:8px;opacity:0.25;">${wm}</span>` : ''}
   `;
-  return el;
+  cell.appendChild(el);
+  return cell;
 }
 
 function clearPreview() {
   $('#previewCards').innerHTML = `<p class="empty">${t('previewHint')}</p>`;
   $('#cardCount').textContent = '';
+  const pm = $('#proofMeta'); if (pm) pm.textContent = '';
   $('#exportBtn').disabled = true;
   $('#exportLongBtn').disabled = true;
 }

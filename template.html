@@ -21,30 +21,53 @@ html, body {
   overflow: hidden;
   font-family: {{LABEL_FONT}}, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
 }
-.noise, .glow-tr, .glow-bl { position: absolute; pointer-events: none; }
-.noise { inset: 0; opacity: 0.05; }
+.noise, .glow-tr, .glow-bl, .sheen { position: absolute; pointer-events: none; }
+.noise { inset: 0; width: 100%; height: 100%; opacity: 0.05; }
 .glow-tr { top: -60px; right: -60px; width: 320px; height: 320px; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%); }
 .glow-bl { bottom: -80px; left: -40px; width: 280px; height: 280px; background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%); }
-.main { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-.pill {
-  display: inline-flex; align-self: flex-start;
-  background: rgba(255,255,255,0.15); border-radius: 32px;
-  padding: 10px 28px; margin-bottom: 40px;
-  font-size: 24px; color: {{TEXT_COLOR}}; letter-spacing: 2px; white-space: nowrap;
+/* Ink-on-paper depth: top sheen, edge vignette, grounded base — turns the flat
+   fill into a richly dyed surface. Sits behind all content (before .main). */
+.sheen {
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0) 24%),
+    radial-gradient(150% 100% at 50% 128%, rgba(0,0,0,0.26) 0%, rgba(0,0,0,0) 56%);
+  box-shadow: inset 0 0 140px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.10);
 }
-.content { flex: 1; overflow: hidden; }
+.main { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
+.pill {
+  position: relative; display: inline-flex; align-items: center; align-self: flex-start;
+  background: rgba(255,255,255,0.13); border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 14px; padding: 11px 26px 11px 34px; margin-bottom: 44px;
+  font-size: 25px; color: {{TEXT_COLOR}}; letter-spacing: 2.5px; white-space: nowrap;
+  text-transform: uppercase;
+  box-shadow: 0 8px 22px -12px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.10);
+}
+.pill::before {
+  content: ""; position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 46%; border-radius: 2px; background: currentColor; opacity: 0.6;
+}
+.content { flex: 1; overflow: hidden; position: relative; }
+/* Inner wrapper fills the content box and vertically centers short text, so
+   brief quotes sit composed in the middle instead of stranded at the top.
+   Long text grows the wrapper past 100%, which the split logic measures. */
+.content-inner { width: 100%; min-height: 100%; display: flex; flex-direction: column; justify-content: center; font-size: {{FONT_SIZE}}px; }
 .content p {
-  font-size: {{FONT_SIZE}}px; line-height: 2.0; color: {{TEXT_COLOR}};
-  margin-bottom: 16px; letter-spacing: 0.5px;
+  font-size: 1em; line-height: 2.0; color: {{TEXT_COLOR}};
+  margin-bottom: 0.57em; letter-spacing: 0.5px;
   font-family: {{BODY_FONT}}, "PingFang SC", "Noto Serif SC", "SimSun", serif;
 }
 .content p:last-child { margin-bottom: 0; }
 .footer {
-  border-top: 1px solid rgba(255,255,255,0.15);
-  padding-top: 24px; margin-top: 32px;
+  padding-top: 26px; margin-top: 34px;
   display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
+  position: relative;
 }
-.footer-title { font-size: 20px; color: {{TEXT_COLOR}}; opacity: 0.4; letter-spacing: 2px; }
+.footer::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.06) 68%, rgba(255,255,255,0) 100%);
+}
+.footer-title { font-size: 20px; color: {{TEXT_COLOR}}; opacity: 0.42; letter-spacing: 2px; }
 .footer-right { display: flex; align-items: center; gap: 8px; }
 .dot { width: 10px; height: 10px; border-radius: 50%; background: {{TEXT_COLOR}}; opacity: 0.25; }
 .dot.active { opacity: 0.85; }
@@ -67,11 +90,12 @@ html, body {
   </svg>
   <div class="glow-tr"></div>
   <div class="glow-bl"></div>
+  <div class="sheen"></div>
   <div class="deco"></div>
   <div class="watermark">{{WATERMARK}}</div>
   <div class="main">
     <div class="pill">{{PILL_LABEL}}</div>
-    <div class="content">{{CONTENT_HTML}}</div>
+    <div class="content"><div class="content-inner">{{CONTENT_HTML}}</div></div>
   </div>
   <div class="footer">
     <span class="footer-title">{{FOOTER_LEFT}}</span>
