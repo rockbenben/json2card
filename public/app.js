@@ -334,10 +334,12 @@ function handleFontUpload(e) {
   const file = e.target.files[0];
   e.target.value = '';  // allow re-selecting the same file later
   if (!file) return;
-  if (file.size > 8 * 1024 * 1024) { alert(t('fontTooLarge')); return; }
+  if (file.size > 8 * 1024 * 1024) { alert(t('fontTooLarge')); return; }  // matches server body limit (8MB → ~11MB base64, under 20mb)
   const reader = new FileReader();
   reader.onload = () => {
-    const name = (file.name.replace(/\.[^.]+$/, '').trim() || 'Custom').slice(0, 40);
+    // Sanitize to CSS-safe chars so the family name is valid in @font-face and
+    // font-family everywhere (preview + export); quotes/braces would break it.
+    const name = (file.name.replace(/\.[^.]+$/, '').replace(/[^\w \-]/g, '').trim() || 'Custom').slice(0, 40);
     currentConfig.customFonts = (currentConfig.customFonts || []).filter(f => f.name !== name);
     currentConfig.customFonts.push({ name, dataUrl: reader.result });
     injectCustomFontFaces();
@@ -365,6 +367,16 @@ function bindEvents() {
     if (currentData) updatePreview();
   });
 
+  // More-tools <details> doesn't auto-close on blur — close it on outside click,
+  // link click, or Escape.
+  document.addEventListener('click', (e) => {
+    const mt = document.querySelector('.more-tools');
+    if (mt?.open && (!mt.contains(e.target) || e.target.closest('.more-tools-menu a'))) mt.removeAttribute('open');
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') document.querySelector('.more-tools')?.removeAttribute('open');
+  });
+
   // Clear history
   $('#clearHistory').addEventListener('click', () => { localStorage.removeItem('cardHistory'); loadHistory(); });
 
@@ -385,7 +397,7 @@ function bindEvents() {
     if (key && PRESETS[key]) {
       const slots = { ...PRESETS[key].slots };
       // Translate preset footer text
-      if (slots.footerLeft === 'text:圆桌论道') slots.footerLeft = 'text:' + t('defaultFooterLeft');
+      if (slots.footerLeft === 'text:Legend Talk') slots.footerLeft = 'text:' + t('defaultFooterLeft');
       if (slots.footerLeft === 'text:摘要') slots.footerLeft = 'text:' + t('footerSummary');
       currentConfig.slots = slots;
       const coverI18n = { roundtable: 'defaultCoverTitle', quote: 'coverQuote', note: 'coverNote', news: 'coverNews' };
@@ -1275,17 +1287,20 @@ async function handleExportLong() {
 
 function saveHistory() {
   const history = JSON.parse(localStorage.getItem('cardHistory') || '[]');
+  const { customFonts, ...configForHistory } = currentConfig;  // don't persist multi-MB font data-URIs
   history.unshift({
     timestamp: new Date().toISOString(),
     title: currentConfig.coverTitle,
     messageCount: currentData.messages.length,
-    config: { ...currentConfig },
+    config: configForHistory,
     jsonMapping: { ...jsonMapping },
     rawJson: rawJson,
     jsonData: currentData,
   });
   if (history.length > 20) history.length = 20;
-  localStorage.setItem('cardHistory', JSON.stringify(history));
+  // Never let a full-storage error surface as an export failure.
+  try { localStorage.setItem('cardHistory', JSON.stringify(history)); }
+  catch (e) { console.warn('History not saved (storage full):', e.message); }
   loadHistory();
 }
 

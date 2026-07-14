@@ -1,7 +1,7 @@
 {
   "name": "json2card",
   "version": "1.1.0",
-  "description": "Turn any JSON into beautiful shareable cards.",
+  "description": "Turn any JSON into clean, on-brand shareable cards — chat exports auto-detected. Web UI, CLI, or REST API.",
   "license": "MIT",
   "engines": {
     "node": ">=18"

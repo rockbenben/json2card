@@ -150,6 +150,28 @@ header .subtitle {
 }
 .lang-select:hover { color: var(--paper); border-color: var(--rule-2); }
 
+/* More-tools dropdown (cross-promo to sibling tools) */
+.more-tools { position: relative; }
+.more-tools > summary { list-style: none; gap: 5px; user-select: none; }
+.more-tools > summary::-webkit-details-marker { display: none; }
+.more-tools > summary::marker { content: ""; }
+.more-tools .mt-caret { font-size: 9px; opacity: 0.7; transition: transform .12s; }
+.more-tools[open] .mt-caret { transform: rotate(180deg); }
+.more-tools-menu {
+  position: absolute; top: calc(100% + 5px); right: 0; z-index: 60;
+  min-width: 180px; display: flex; flex-direction: column;
+  background: var(--ink-800); border: 1px solid var(--rule-2);
+  box-shadow: 0 14px 34px -14px rgba(0,0,0,0.65);
+}
+[dir="rtl"] .more-tools-menu { right: auto; left: 0; }
+.more-tools-menu a {
+  font-family: var(--mono); font-size: 12px; padding: 9px 14px;
+  color: var(--paper-dim); text-decoration: none; white-space: nowrap;
+  border-bottom: 1px solid var(--rule); transition: color .1s, background .1s;
+}
+.more-tools-menu a:last-child { border-bottom: none; }
+.more-tools-menu a:hover { background: var(--ink-650); color: var(--cyan); }
+
 /* ============================================================
    Main split
    ============================================================ */

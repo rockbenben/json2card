@@ -29,7 +29,7 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '20mb' }));  // headroom for an 8MB uploaded font (~11MB base64) plus config
 
 // Rate limiter — disabled with RATE_LIMIT=0, default 10 req/min/IP
 const RATE_MAX = parseInt(process.env.RATE_LIMIT ?? '10');

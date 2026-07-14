@@ -1,8 +1,10 @@
 # json2card
 
-> 365 Open Source Plan #003 · Turn any JSON into beautiful shareable cards — via Web UI, CLI, or REST API.
+> 365 Open Source Plan #003 · Turn any JSON into clean, on-brand cards — chat exports auto-detected. Web UI, CLI, or REST API.
 
 [中文文档](README.zh.md)
+
+Stop screenshotting messy Slack, ChatGPT, or Claude threads. Paste the raw export and json2card auto-detects the format and lays it out as shareable cards — no schema setup, no cleaning it up in Figma afterward. Match your brand, then drop the PNGs straight into a blog post, Notion, or a 16:9 slide deck.
 
 ![Web UI](docs/web-ui.png)
 
@@ -10,13 +12,12 @@
 
 ## Features
 
-- **Three ways to use** — Web UI for visual editing, CLI for batch processing, REST API for integration
-- **Auto format detection** — Paste ChatGPT, Claude, Telegram, Discord, Slack exports or any custom JSON; format recognized automatically via multi-sample validation
-- **Rich customization** — 6 style presets, 5 card sizes, 16-color palette, custom fonts, 4-slot layout, watermark
-- **Smart pagination** — Long messages auto-split across cards with accurate overflow detection
-- **Clean output** — Markdown syntax stripped automatically, cards show pure text
-- **Cross-origin API** — CORS enabled, deploy once and call from anywhere
-- **Fast rendering** — File-based font loading + page reuse, ~100ms per card on warm server
+- **Auto-detects any export** — ChatGPT, Claude, Telegram, Discord, Slack, or your own JSON. Multi-sample validation gets the structure right on the first try; for an odd shape, point at the fields with a one-line mapping.
+- **Make it yours before export** — Brand theme (one background + text color to match your blog or slide deck), upload your own font, 6 style presets in a visual gallery, 16-color palette, 5 sizes, watermark — no editing the PNG afterward.
+- **Handles messy input gracefully** — Long messages auto-paginate, nested / non-string content is coerced to text, fenced code blocks stay monospace, and markdown is stripped to clean prose. It degrades, it doesn't blow up the layout.
+- **Three ways to use** — Web UI for visual editing, CLI for batch jobs (no more one-off scripts), REST API for integration.
+- **Auto-fit typography** — Short quotes scale up to fill the frame; dense and paginated text keeps your chosen size.
+- **Fast & portable** — CORS-enabled API, file-based fonts + page reuse (~100ms per card on a warm server), one-command Docker deploy.
 
 ## Get Started
 
@@ -48,18 +49,28 @@ npm install && npm run setup-fonts && npm start
 | `mapping.*.message...` | ChatGPT export |
 | Any structure | Auto-discovered or manual field mapping |
 
+Each message renders its **text**; non-text attachments (images, files) are skipped, code blocks are kept as monospace, and other markdown is stripped to clean prose.
+
+Chat is the sweet spot, but under the hood it's just *records → cards*: map any array of objects — quotes, notes, FAQ items, changelog entries — onto a label + text field and each row becomes a card (see the Quote / Note / News templates).
+
 ## Customization
 
 | Category | Options |
 |----------|---------|
-| **Style** | 6 presets (Classic, Gentle, Textured, Quote, Magazine, Elegant) + 7 tunable params |
-| **Size** | 3:4 Portrait, 1:1 Square, 4:3 Landscape, 9:16 Tall, 16:9 Wide |
+| **Templates** | Roundtable, Quote, Note, News — one click re-slots the layout for that use |
+| **Style** | 6 presets (Classic, Gentle, Textured, Quote, Magazine, Elegant) via visual gallery + 7 tunable params |
+| **Brand theme** | Solid background + text color across the whole set, with one-click presets |
+| **Size** | 3:4 portrait, 1:1 square, 4:3 landscape, 9:16 story, **16:9 for slides & decks** (1920×1080) |
 | **Colors** | 16 auto-assigned muted tones, per-speaker override |
-| **Fonts** | Drop files into `fonts/`, auto-detected |
+| **Fonts** | Auto-detected from `fonts/`, or upload one in the browser (data-URI embed; best for Latin/subset fonts) |
 | **Layout** | 4 slots (header, body, footer left/right) x any field |
 | **Watermark** | Custom text, bottom-right |
-| **Language** | Chinese / English |
+| **Language** | 18 UI languages, incl. right-to-left (Arabic) |
 | **Theme** | Dark / Light |
+
+**16:9 + a brand theme = a drop-in slide** — same conversation, deck-ready at 1920×1080:
+
+![16:9 slide example](docs/slide-example.png)
 
 ## API
 
@@ -126,6 +137,8 @@ All fields optional. Defaults used when omitted.
     "coverTitle": "Legend Talk",
     "fontSize": 28,
     "cardStyle": "classic",
+    "brandBg": "",
+    "brandText": "",
     "styleParams": {
       "textAlign": "left",
       "borderRadius": 40,

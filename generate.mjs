@@ -57,12 +57,12 @@ export const CARD_SIZES = {
   '1:1':  { width: 1080, height: 1080, label: '1:1 朋友圈/微博' },
   '4:3':  { width: 1080, height: 810,  label: '4:3 横版' },
   '9:16': { width: 1080, height: 1920, label: '9:16 Instagram Story' },
-  '16:9': { width: 1920, height: 1080, label: '16:9 公众号头图' },
+  '16:9': { width: 1920, height: 1080, label: '16:9 幻灯片 / 宽屏' },
 };
 
 export const DEFAULT_SLOTS = {
   badge: 'displayLabel', body: 'content',
-  footerLeft: 'text:圆桌论道', footerRight: 'pageIndicator',
+  footerLeft: 'text:Legend Talk', footerRight: 'pageIndicator',
 };
 
 // Visual style parameters — all individually adjustable in Web UI
@@ -89,7 +89,7 @@ export const CARD_STYLES = {
 };
 
 export const PRESETS = {
-  roundtable: { label: '圆桌讨论', slots: { ...DEFAULT_SLOTS }, coverTitle: '圆桌论道', cardStyle: 'classic' },
+  roundtable: { label: '圆桌讨论', slots: { ...DEFAULT_SLOTS }, coverTitle: 'Legend Talk', cardStyle: 'classic' },
   quote:      { label: '语录卡片', slots: { badge: 'name', body: 'content', footerLeft: 'text:—', footerRight: 'characterId' }, coverTitle: '语录', cardStyle: 'quote' },
   note:       { label: '笔记卡片', slots: { badge: 'label', body: 'content', footerLeft: 'pageIndicator', footerRight: 'text:' }, coverTitle: '笔记', cardStyle: 'gentle' },
   news:       { label: '新闻摘要', slots: { badge: 'displayLabel', body: 'content', footerLeft: 'text:摘要', footerRight: 'pageIndicator' }, coverTitle: '新闻摘要', cardStyle: 'magazine' },
@@ -464,7 +464,9 @@ export async function renderCardsFromData(data, config = {}, templatePath, fonts
         } else {
           const inner = window.CardRules.resetContentInner(box);  // clean wrapper (see card-rules.js)
           inner.innerHTML = u.bodyHtml;
-          document.querySelectorAll('.content p').forEach(p => { p.style.color = tc; });
+          // Recolor body + code blocks per-card; the static {{TEXT_COLOR}} baked
+          // into pre.code at init would otherwise stay the first card's color.
+          document.querySelectorAll('.content p, .content pre.code').forEach(el => { el.style.color = tc; });
           // Short single-page bodies grow to fill the frame; dense/paginated keep size.
           if (u.autoFit) window.CardRules.autoFitFontSize(inner, box);
         }
