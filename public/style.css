@@ -106,7 +106,6 @@ header h1 {
   white-space: nowrap;
 }
 header h1 .mark-a { color: var(--cyan); }
-header h1 .mark-dot { color: var(--paper-faint); margin: 0 1px; }
 header h1 .mark-b { color: var(--paper); }
 
 header .subtitle {
@@ -433,7 +432,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 
 /* ── Brand theme ── */
 .brand-block { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px dashed var(--rule); }
-.brand-head { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--paper-dim); cursor: pointer; margin-bottom: 10px; }
+.brand-block .brand-head { display: flex; justify-content: flex-start; align-items: center; gap: 8px; font-size: 13px; color: var(--paper-dim); cursor: pointer; margin-bottom: 10px; }
 .brand-head input { accent-color: var(--cyan); width: 14px; height: 14px; }
 .brand-controls label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; color: var(--paper-dim); }
 .brand-controls input[type="color"] { width: 46px; height: 26px; border: 1px solid var(--rule); border-radius: 0; background: transparent; padding: 2px; cursor: pointer; }
