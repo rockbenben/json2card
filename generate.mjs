@@ -104,6 +104,7 @@ const DEFAULT_CONFIG = {
   // Brand theme: when brandBg is set, every card (incl. cover) uses this solid
   // background + text color instead of per-speaker gradients. Empty = off.
   brandBg: '', brandText: '',
+  customFonts: [],  // [{name, dataUrl}] uploaded in the browser, embedded at render
 };
 
 // ── Helpers ──
@@ -388,7 +389,13 @@ export async function renderCardsFromData(data, config = {}, templatePath, fonts
   const usedNames = [...new Set([bodyName, labelName])];
   const cacheKey = usedNames.sort().join(',');
   if (_fontCacheKey !== cacheKey) { _fontCSSCache = generateFontFaceCSS(_allFonts, fontsDir, false, usedNames); _fontCacheKey = cacheKey; }
-  const template = _templateCache, fontCSS = _fontCSSCache;
+  const template = _templateCache;
+  // Append user-uploaded fonts as data-URI @font-face so exports match the preview.
+  let fontCSS = _fontCSSCache, customKey = '';
+  if (cfg.customFonts?.length) {
+    fontCSS += '\n' + cfg.customFonts.map(f => `@font-face{font-family:${JSON.stringify(f.name)};src:url(${JSON.stringify(f.dataUrl)});font-display:block;}`).join('\n');
+    customKey = ':' + cfg.customFonts.map(f => f.name).join(',');
+  }
   const size = CARD_SIZES[cfg.cardSize] || CARD_SIZES['3:4'];
 
   const ownBrowser = !browser;
@@ -396,7 +403,7 @@ export async function renderCardsFromData(data, config = {}, templatePath, fonts
   try {
     const initCard = { gradientStart: '#0c0c0c', gradientEnd: '#1a1a1a', textColor: '#f0e6d2', content: '', _isHtml: true, index: 1, total: 1 };
     const initHtml = buildHtml(template, initCard, cfg, fontCSS);
-    const pageKey = `${size.width}x${size.height}:${cacheKey}`;
+    const pageKey = `${size.width}x${size.height}:${cacheKey}${customKey}`;
 
     // Reuse warm page if available (fonts already loaded), otherwise create new
     let page;

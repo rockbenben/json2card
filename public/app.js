@@ -27,6 +27,7 @@ let currentConfig = {
   coverExcludeRoles: ['Moderator'],
   brandBg: '',    // brand theme: solid background for every card (empty = per-speaker colors)
   brandText: '',  // brand theme: text color
+  customFonts: [], // [{name, dataUrl}] uploaded in the browser
 };
 let availableFonts = [];
 let rawJson = null; // unparsed original JSON (before normalization)
@@ -306,6 +307,46 @@ function populateFontSelect(selector, fonts, defaultName) {
   if (!fonts.length) el.innerHTML = '<option>系统默认</option>';
 }
 
+// ── Custom font upload (embedded as data-URI, works in preview + export) ──
+function injectCustomFontFaces() {
+  let el = document.getElementById('customFontFaces');
+  if (!el) { el = document.createElement('style'); el.id = 'customFontFaces'; document.head.appendChild(el); }
+  el.textContent = (currentConfig.customFonts || [])
+    .map(f => `@font-face{font-family:'${f.name}';src:url('${f.dataUrl}');font-display:block;}`).join('\n');
+}
+
+function addFontOption(name) {
+  for (const sel of ['#bodyFont', '#labelFont']) {
+    const el = $(sel);
+    if (![...el.options].some(o => o.value === name)) el.add(new Option(name + ' ⬆', name));
+  }
+}
+
+function restoreCustomFonts() {
+  injectCustomFontFaces();
+  (currentConfig.customFonts || []).forEach(f => addFontOption(f.name));
+}
+
+function handleFontUpload(e) {
+  const file = e.target.files[0];
+  e.target.value = '';  // allow re-selecting the same file later
+  if (!file) return;
+  if (file.size > 8 * 1024 * 1024) { alert(t('fontTooLarge')); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const name = (file.name.replace(/\.[^.]+$/, '').trim() || 'Custom').slice(0, 40);
+    currentConfig.customFonts = (currentConfig.customFonts || []).filter(f => f.name !== name);
+    currentConfig.customFonts.push({ name, dataUrl: reader.result });
+    injectCustomFontFaces();
+    addFontOption(name);
+    $('#bodyFont').value = name;
+    currentConfig.bodyFont = `'${name}'`;
+    $('#fontPairing').value = 'custom';
+    updatePreview();
+  };
+  reader.readAsDataURL(file);
+}
+
 // ── Events ──
 
 function bindEvents() {
@@ -362,6 +403,8 @@ function bindEvents() {
   });
   $('#watermark').addEventListener('input', () => { currentConfig.watermark = $('#watermark').value; updatePreview(); });
   setupBrandTheme();
+  $('#fontUploadBtn').addEventListener('click', () => $('#fontUpload').click());
+  $('#fontUpload').addEventListener('change', handleFontUpload);
   // Font pairing
   $('#fontPairing').addEventListener('change', () => {
     const pair = FONT_PAIRINGS[$('#fontPairing').value];
@@ -1236,6 +1279,7 @@ function loadHistory() {
       if (currentConfig.cardStyle) $('#cardStyleSelect').value = currentConfig.cardStyle;
       if (currentConfig.styleParams) syncStyleParamsToUI();
       syncBrandUI();
+      restoreCustomFonts();
 
       syncMappingToUI();
       populateSlotDropdowns();
