@@ -603,15 +603,20 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .card-preview .content-preview {
   position: relative;
   z-index: 1;
-  font-size: 14px;
   line-height: 2.0;
   overflow: hidden;
   flex: 1;
+}
+/* cp-inner mirrors the export's .content-inner: holds the base font-size, fills
+   and vertically centers, so the shared autoFitFontSize measures/scales it. */
+.card-preview .cp-inner {
+  width: 100%;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  font-size: 14px;
 }
-.card-preview .cp-inner { display: block; width: 100%; }
 .card-preview .footer-preview {
   position: relative;
   margin-top: 14px;

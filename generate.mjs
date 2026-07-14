@@ -6,7 +6,9 @@ import puppeteer from 'puppeteer';
 import { readFileSync } from 'node:fs';
 import removeMarkdown from 'remove-markdown';
 import { scanFonts, generateFontFaceCSS } from './fonts.mjs';
-const { buildCardList } = new Function(readFileSync(new URL('./public/card-rules.js', import.meta.url), 'utf-8') + '\nreturn CardRules;')();
+const _cardRulesSrc = readFileSync(new URL('./public/card-rules.js', import.meta.url), 'utf-8');
+const CardRules = new Function(_cardRulesSrc + '\nreturn CardRules;')();
+const { buildCardList } = CardRules;
 
 // ── Constants ──
 
@@ -43,7 +45,8 @@ export const HIDDEN_ROLES = ['summary', 'you'];
 
 /** Get style for a character by index — guarantees no color/icon collision within 16 characters */
 export function getCharStyle(name, index = -1) {
-  const i = index >= 0 ? index : Math.abs([...String(name)].reduce((h, c) => (h << 5) - h + c.charCodeAt(0), 0));
+  name = name == null ? '' : String(name);  // tolerate missing speaker id (raw API messages)
+  const i = index >= 0 ? index : Math.abs([...name].reduce((h, c) => (h << 5) - h + c.charCodeAt(0), 0));
   const color = COLOR_PALETTE[i % COLOR_PALETTE.length];
   const icon = FIXED_ICONS[name.toLowerCase()] || CHAR_ICONS[i % CHAR_ICONS.length];
   return { ...color, textColor: 'white', icon, label: name, name };
@@ -207,29 +210,22 @@ function buildCoverCard(data, config) {
     .map(id => config.colorOverrides[id]?.name || id)
     .join('  ·  ');
 
-  const bodyFont = config.bodyFont || "'Noto Serif SC'";
   const voiceCount = (data.characters || []).filter(id => !excludeSet.has(id.toLowerCase())).length;
 
   return {
     gradientStart: '#0c0c0c', gradientEnd: '#1a1a1a', textColor: '#f0e6d2',
     label: '', name: '封面', suffix: '', _isHtml: true,
-    // Title plate — the first slide viewers see. A registration tick, the
-    // cover title as hero, a rule, one representative line, and the roster.
-    content: `<div style="height:100%;display:flex;flex-direction:column;color:#f0e6d2;">
-  <div style="display:flex;align-items:center;gap:16px;opacity:0.42;font-size:20px;letter-spacing:3px;">
-    <span style="display:inline-block;width:22px;height:22px;border:1.5px solid currentColor;border-radius:50%;position:relative;flex-shrink:0;">
-      <span style="position:absolute;left:50%;top:-6px;width:1.5px;height:34px;background:currentColor;transform:translateX(-50%);"></span>
-      <span style="position:absolute;top:50%;left:-6px;height:1.5px;width:34px;background:currentColor;transform:translateY(-50%);"></span>
-    </span>
-    <span>${voiceCount ? voiceCount + '&#8202;·&#8202;VOICES' : 'PROOF'}</span>
-  </div>
-  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
-    <div style="font-size:62px;line-height:1.24;letter-spacing:1px;font-weight:600;margin-bottom:40px;">${escapeHtml(config.coverTitle || '')}</div>
-    <div style="width:56px;height:2px;background:currentColor;opacity:0.35;margin-bottom:40px;"></div>
-    <div style="font-size:30px;line-height:1.95;opacity:0.74;font-family:${bodyFont},'Noto Serif SC',serif;">${escapeHtml(summary)}</div>
-  </div>
-  <div style="font-size:22px;line-height:1.7;letter-spacing:2px;opacity:0.5;">${escapeHtml(names)}</div>
-</div>`,
+    // Title plate — the first slide viewers see. Shared with the web preview.
+    content: CardRules.coverPlateHTML({
+      kicker: voiceCount ? `${voiceCount} · VOICES` : 'PROOF',
+      title: escapeHtml(config.coverTitle || ''),
+      summary: escapeHtml(summary),
+      names: escapeHtml(names),
+      textColor: '#f0e6d2',
+      bodyFont: config.bodyFont || "'Noto Serif SC'",
+      labelFont: config.labelFont,
+      scale: 1,
+    }),
   };
 }
 
@@ -269,7 +265,9 @@ async function splitByRendering(page, colorConfig, content, config) {
 
     const box = document.querySelector('.content');
     let el = box.querySelector('.content-inner');
-    if (!el) { el = document.createElement('div'); el.className = 'content-inner'; box.appendChild(el); }
+    if (!el || box.children.length > 1) {  // clear a leftover cover node (warm page)
+      box.innerHTML = ''; el = document.createElement('div'); el.className = 'content-inner'; box.appendChild(el);
+    }
     el.style.fontSize = '';  // clear any auto-fit scale left by a prior render (warm page)
     // Measure the inner wrapper's natural height (unaffected by the flex
     // centering on .content) against the available box height.
@@ -335,11 +333,24 @@ let _allFonts = null, _allFontsDir = null;
 // Page pool: reuse page with fonts already loaded (skip ~1s font load on 2nd+ render)
 let _warmPage = null, _warmPageKey = null, _warmPageBrowser = null;
 
+/** Coerce a message's content to a plain string. Handles OpenAI-style content
+ *  parts (`[{type:'text', text:'...'}]`), numbers, null — anything a caller may
+ *  POST — so downstream `.split()` never throws. */
+function toText(v) {
+  if (typeof v === 'string') return v;
+  if (v == null) return '';
+  if (Array.isArray(v)) return v.map(p => (p && typeof p === 'object') ? (p.text ?? p.content ?? '') : p).join('');
+  return String(v);
+}
+
 /** Normalize messages: convert array format [speaker, text] to {role, content, characterId} */
 function normalizeMessages(data) {
   if (!data?.messages?.length) return data;
   const first = data.messages[0];
-  if (!Array.isArray(first)) return data; // already object format
+  // Object format — coerce content to string (callers may send arrays/numbers).
+  if (!Array.isArray(first)) {
+    return { ...data, messages: data.messages.map(m => (m && typeof m === 'object') ? { ...m, content: toText(m.content) } : m) };
+  }
   const userRole = 'You';
   const messages = data.messages.map(m => {
     const speaker = String(m[0] || '');
@@ -391,6 +402,7 @@ export async function renderCardsFromData(data, config = {}, templatePath, fonts
       await fs.writeFile(tmpFile, initHtml);
       await page.goto(`file:///${tmpFile.replace(/\\/g, '/')}`, { waitUntil: 'domcontentloaded' });
       await page.evaluate(() => document.fonts.ready);
+      await page.addScriptTag({ content: _cardRulesSrc });  // expose window.CardRules (shared auto-fit)
       await fs.unlink(tmpFile).catch(() => {});
     }
     _warmPage = page; _warmPageKey = pageKey; _warmPageBrowser = browser;
@@ -422,41 +434,31 @@ export async function renderCardsFromData(data, config = {}, templatePath, fonts
     for (const card of cards) {
       const d = buildCardData(card, cfg, card._rawMsg || {});
       d.autoFit = !!card._single && !card._isHtml;  // scale up short, single-page bodies to fill the frame
+      d.isCover = !!card._isHtml;
       await page.evaluate((u) => {
         document.getElementById('card-css').textContent = u.styleCSS;
         const tc = u.textColor;
         document.querySelector('.pill').textContent = u.badge;
         document.querySelector('.pill').style.color = tc;
         const box = document.querySelector('.content');
-        let inner = box.querySelector('.content-inner');
-        if (!inner) { inner = document.createElement('div'); inner.className = 'content-inner'; box.appendChild(inner); }
-        inner.innerHTML = u.bodyHtml;
-        document.querySelectorAll('.content p').forEach(p => { p.style.color = tc; });
-        // Auto-fit: a brief quote stranded in a big (esp. tall) frame reads as a
-        // mistake. Grow the type toward a comfortable fill — more on tall cards,
-        // less on square — capped so it never shouts or clips. Dense cards and
-        // paginated pages keep the user's chosen size.
-        inner.style.fontSize = '';
-        if (u.autoFit) {
-          const boxH = box.clientHeight;
-          // Drop min-height so scrollHeight reports the NATURAL content height
-          // (the wrapper is otherwise forced to fill the box for centering).
-          inner.style.minHeight = '0';
-          const base = parseFloat(getComputedStyle(inner).fontSize) || 28;
-          if (inner.scrollHeight < boxH * 0.5) {
-            const maxFs = base * 2.2;
-            let fs = base;
-            while (fs < maxFs) {
-              const next = Math.min(fs + 2, maxFs);
-              inner.style.fontSize = next + 'px';
-              if (inner.scrollHeight > boxH * 0.62 || inner.scrollHeight > boxH - 8) {
-                if (inner.scrollHeight > boxH - 8) inner.style.fontSize = fs + 'px';
-                break;
-              }
-              fs = next;
-            }
+        if (u.isCover) {
+          // The cover's own HTML uses height:100% + flex:1 to span the frame.
+          // Render it straight into .content (definite height) — nesting it in
+          // the min-height:100% .content-inner collapses that layout.
+          box.innerHTML = u.bodyHtml;
+        } else {
+          // Ensure .content holds exactly one .content-inner — a prior cover set
+          // box.innerHTML directly, so any leftover node must be cleared first.
+          let inner = box.querySelector('.content-inner');
+          if (!inner || box.children.length > 1) {
+            box.innerHTML = '';
+            inner = document.createElement('div'); inner.className = 'content-inner'; box.appendChild(inner);
           }
-          inner.style.minHeight = '';  // restore fill so justify-center re-centers
+          inner.innerHTML = u.bodyHtml;
+          document.querySelectorAll('.content p').forEach(p => { p.style.color = tc; });
+          inner.style.fontSize = '';  // clear any warm-page auto-fit leftover
+          // Short single-page bodies grow to fill the frame; dense/paginated keep size.
+          if (u.autoFit && window.CardRules) window.CardRules.autoFitFontSize(inner, box);
         }
         document.querySelector('.footer-title').textContent = u.footerLeft;
         document.querySelector('.footer-title').style.color = tc;

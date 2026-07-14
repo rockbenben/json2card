@@ -955,28 +955,13 @@ function updatePreview() {
   $('#exportBtn').disabled = false;
   $('#exportLongBtn').disabled = false;
 
-  // Auto-fit preview bodies to mirror the exported cards (short → larger type).
+  // Auto-fit preview bodies to mirror the exported cards (short → larger type),
+  // using the same CardRules.autoFitFontSize as the export.
   requestAnimationFrame(() => {
     container.querySelectorAll('.card-preview').forEach(cardEl => {
       const cp = cardEl.querySelector('.content-preview');
       const inner = cardEl.querySelector('.cp-inner');
-      if (!cp || !inner) return;
-      cp.style.fontSize = '';
-      const boxH = cp.clientHeight;
-      const base = parseFloat(getComputedStyle(cp).fontSize) || 14;
-      if (inner.scrollHeight < boxH * 0.5) {
-        const maxFs = base * 2.2;
-        let fs = base;
-        while (fs < maxFs) {
-          const next = Math.min(fs + 1, maxFs);
-          cp.style.fontSize = next + 'px';
-          if (inner.scrollHeight > boxH * 0.62 || inner.scrollHeight > boxH - 4) {
-            if (inner.scrollHeight > boxH - 4) cp.style.fontSize = fs + 'px';
-            break;
-          }
-          fs = next;
-        }
-      }
+      if (cp && inner && window.CardRules) CardRules.autoFitFontSize(inner, cp);
     });
   });
 }
@@ -1013,25 +998,19 @@ function createCardPreview(card, index, total, aspect, rawMsg = {}) {
   el.style.background = `linear-gradient(${p.gradientAngle}deg, ${start}, ${end})`;
   el.style.borderRadius = `${p.borderRadius / 2.5}px`;
 
-  // Cover plate — dedicated title-plate layout (mirrors buildCoverCard output)
+  // Cover plate — same builder as the export (generate.mjs), scaled down
   if (card._cover) {
-    const bf = currentConfig.bodyFont || "'Noto Serif SC'";
     el.style.color = card.textColor;
-    el.innerHTML = `
-      <div style="display:flex;align-items:center;gap:7px;opacity:0.45;font-size:8.5px;letter-spacing:1.5px;font-family:var(--mono);text-transform:uppercase;">
-        <span style="position:relative;display:inline-block;width:9px;height:9px;border:1px solid currentColor;border-radius:50%;flex-shrink:0;">
-          <span style="position:absolute;left:50%;top:-3px;height:15px;width:1px;background:currentColor;transform:translateX(-50%);"></span>
-          <span style="position:absolute;top:50%;left:-3px;width:15px;height:1px;background:currentColor;transform:translateY(-50%);"></span>
-        </span>
-        <span>${card._voiceCount ? card._voiceCount + ' · Voices' : 'Proof'}</span>
-      </div>
-      <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
-        <div style="font-size:24px;line-height:1.2;font-weight:600;letter-spacing:0.3px;font-family:${currentConfig.labelFont},sans-serif;margin-bottom:12px;">${escapeHtml(card._coverTitle)}</div>
-        <div style="width:26px;height:1.5px;background:currentColor;opacity:0.35;margin-bottom:12px;"></div>
-        <div style="font-size:12px;line-height:1.75;opacity:0.72;font-family:${bf},serif;">${escapeHtml(card._coverSummary)}</div>
-      </div>
-      <div style="font-size:10px;line-height:1.6;letter-spacing:1px;opacity:0.5;">${escapeHtml(card._coverNames)}</div>
-    `;
+    el.innerHTML = CardRules.coverPlateHTML({
+      kicker: card._voiceCount ? `${card._voiceCount} · VOICES` : 'PROOF',
+      title: escapeHtml(card._coverTitle),
+      summary: escapeHtml(card._coverSummary),
+      names: escapeHtml(card._coverNames),
+      textColor: card.textColor,
+      bodyFont: currentConfig.bodyFont || "'Noto Serif SC'",
+      labelFont: currentConfig.labelFont,
+      scale: 0.4,
+    });
     cell.appendChild(el);
     return cell;
   }

@@ -45,7 +45,66 @@ const CardRules = (() => {
     return cards;
   }
 
-  return { buildCardList };
+  // ── Auto-fit (shared by export page.evaluate and web preview) ──
+  // Single source of truth for how a short body grows to fill its frame.
+  const AUTOFIT = { trigger: 0.5, target: 0.62, maxScale: 2.2, edge: 8 };
+
+  /**
+   * Scale `inner`'s font up so a short body fills its box comfortably — larger
+   * on tall cards, smaller on square, capped so it never shouts or clips. Dense
+   * bodies are left untouched. Binary search keeps reflows to ~a dozen reads.
+   * DOM-only; runs in the browser (preview) and inside Puppeteer (export).
+   * @param {HTMLElement} inner - measured/scaled wrapper (min-height:100%, holds font-size)
+   * @param {HTMLElement} box   - the clipping frame providing available height
+   */
+  function autoFitFontSize(inner, box) {
+    inner.style.fontSize = '';
+    const boxH = box.clientHeight;
+    inner.style.minHeight = '0'; // measure NATURAL height (wrapper otherwise fills)
+    const base = parseFloat(getComputedStyle(inner).fontSize) || 28;
+    if (inner.scrollHeight < boxH * AUTOFIT.trigger) {
+      const cap = Math.min(boxH * AUTOFIT.target, boxH - AUTOFIT.edge);
+      const fitsAt = (fs) => { inner.style.fontSize = fs + 'px'; return inner.scrollHeight <= cap; };
+      let lo = base, hi = base * AUTOFIT.maxScale, best = base;
+      for (let i = 0; i < 12 && hi - lo > 0.5; i++) {
+        const mid = (lo + hi) / 2;
+        if (fitsAt(mid)) { best = mid; lo = mid; } else { hi = mid; }
+      }
+      inner.style.fontSize = Math.floor(best) + 'px';
+    }
+    inner.style.minHeight = ''; // restore fill so justify-center re-centers
+  }
+
+  /**
+   * Cover "title plate" markup — shared by export (generate.mjs, scale 1) and
+   * the web preview (scale ~0.4) so the two never drift. Text fields must be
+   * pre-escaped by the caller.
+   */
+  function coverPlateHTML(o) {
+    const s = o.scale || 1;
+    const px = (n) => +(n * s).toFixed(2);
+    const cross = px(22), lineLen = px(34), off = (lineLen - cross) / 2, lw = Math.max(1, px(1.5));
+    const label = o.labelFont ? `font-family:${o.labelFont},sans-serif;` : '';
+    return `<div style="height:100%;display:flex;flex-direction:column;color:${o.textColor};">
+  <div style="display:flex;align-items:center;gap:${px(15)}px;opacity:0.44;font-size:${px(20)}px;letter-spacing:${px(2.5)}px;font-family:ui-monospace,'SF Mono','Cascadia Code',Consolas,monospace;text-transform:uppercase;">
+    <span style="position:relative;display:inline-block;width:${cross}px;height:${cross}px;border:${lw}px solid currentColor;border-radius:50%;flex-shrink:0;">
+      <span style="position:absolute;left:50%;top:${-off}px;height:${lineLen}px;width:${lw}px;background:currentColor;transform:translateX(-50%);"></span>
+      <span style="position:absolute;top:50%;left:${-off}px;width:${lineLen}px;height:${lw}px;background:currentColor;transform:translateY(-50%);"></span>
+    </span>
+    <span>${o.kicker}</span>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+    <div style="font-size:${px(62)}px;line-height:1.22;letter-spacing:${px(1)}px;font-weight:600;margin-bottom:${px(38)}px;${label}">${o.title}</div>
+    <div style="width:${px(56)}px;height:${Math.max(1.5, px(2))}px;background:currentColor;opacity:0.35;margin-bottom:${px(38)}px;"></div>
+    <div style="font-size:${px(30)}px;line-height:1.95;opacity:0.74;font-family:${o.bodyFont},'Noto Serif SC',serif;">${o.summary}</div>
+  </div>
+  <div style="font-size:${px(22)}px;line-height:1.7;letter-spacing:${px(2)}px;opacity:0.5;">${o.names}</div>
+</div>`;
+  }
+
+  return { buildCardList, autoFitFontSize, coverPlateHTML, AUTOFIT };
 })();
 
-// Node: loaded via Function() wrapper in generate.mjs
+// Browser: expose as a window global so Puppeteer-injected pages and app.js
+// can both reach it. Node (generate.mjs Function wrapper) has no window.
+if (typeof window !== 'undefined') window.CardRules = CardRules;
