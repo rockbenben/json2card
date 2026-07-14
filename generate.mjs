@@ -123,8 +123,16 @@ function escapeHtml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function paraHtmlOf(raw) {
+  const c = removeMarkdown(raw).trim();
+  return c ? `<p>${escapeHtml(c)}</p>` : '';
+}
+
 function contentToHtml(text) {
-  return removeMarkdown(text).split(/\n{1,}/).filter(p => p.trim()).map(p => `<p>${escapeHtml(p)}</p>`).join('\n');
+  return CardRules.splitUnits(text).map(u => u.code
+    ? `<pre class="code">${escapeHtml(CardRules.fenceBody(u.raw))}</pre>`
+    : paraHtmlOf(u.raw)
+  ).filter(Boolean).join('\n');
 }
 
 function generateDotsHtml(current, total) {
@@ -134,10 +142,13 @@ function generateDotsHtml(current, total) {
   ).join('\n');
 }
 
-export function resolveSlot(source, card, rawMsg = {}) {
+// raw=true returns the unescaped value — used for the body, which contentToHtml
+// escapes itself (escaping here too would double-escape quotes/&/< in the text).
+export function resolveSlot(source, card, rawMsg = {}, raw = false) {
+  const esc = raw ? (s) => s : escapeHtml;
   if (!source) return '';
-  if (source.startsWith('text:')) return escapeHtml(source.slice(5));
-  if (source.startsWith('raw:')) { const k = source.slice(4); return rawMsg[k] != null ? escapeHtml(String(rawMsg[k])) : ''; }
+  if (source.startsWith('text:')) return esc(source.slice(5));
+  if (source.startsWith('raw:')) { const k = source.slice(4); return rawMsg[k] != null ? esc(String(rawMsg[k])) : ''; }
   const map = {
     displayLabel: card.displayLabel || card.label || '',
     content: card.content || '', icon: card.icon || '',
@@ -146,7 +157,7 @@ export function resolveSlot(source, card, rawMsg = {}) {
     pageIndicator: `${card.index} / ${card.total}`,
   };
   const val = map[source] ?? (rawMsg[source] != null ? String(rawMsg[source]) : '');
-  return source === 'pageIndicator' ? val : escapeHtml(val);
+  return source === 'pageIndicator' ? val : esc(val);
 }
 
 // ── Template ──
@@ -176,7 +187,7 @@ function buildCardData(card, config, rawMsg = {}) {
     styleCSS: buildCardCSS(card, config),
     textColor: config.brandText || card.textColor,
     badge: resolveSlot(slots.badge, card, rawMsg),
-    bodyHtml: card._isHtml ? card.content : contentToHtml(resolveSlot(slots.body, card, rawMsg)),
+    bodyHtml: card._isHtml ? card.content : contentToHtml(resolveSlot(slots.body, card, rawMsg, true)),
     footerLeft: resolveSlot(slots.footerLeft, card, rawMsg),
     dotsHtml: slots.footerRight === 'pageIndicator' ? generateDotsHtml(card.index, card.total) : '',
     pageIndicator: resolveSlot(slots.footerRight, card, rawMsg),
@@ -227,15 +238,16 @@ function buildCoverCard(data, config) {
 // ── Overflow splitting (Puppeteer) ──
 
 async function splitByRendering(page, colorConfig, content, config) {
-  // Pre-process in Node: strip markdown + escape + wrap — once per paragraph
-  const paragraphs = content.split(/\n{1,}/).filter(p => p.trim());
-  const paraHtml = paragraphs.map(p => {
-    const clean = removeMarkdown(p).trim();
-    return clean ? `<p>${escapeHtml(clean)}</p>` : '';
-  });
-  // Pre-compute sentence HTML for oversized paragraphs
-  const sentData = paragraphs.map(p => {
-    const sents = p.split(/(?<=[。！？])/);
+  // Tokenize into units (fenced code blocks stay atomic); precompute HTML per unit
+  const units = CardRules.splitUnits(content);
+  const paragraphs = units.map(u => u.raw);
+  const paraHtml = units.map(u => u.code
+    ? `<pre class="code">${escapeHtml(CardRules.fenceBody(u.raw))}</pre>`
+    : paraHtmlOf(u.raw));
+  // Pre-compute sentence HTML for oversized text paragraphs (never for code)
+  const sentData = units.map(u => {
+    if (u.code) return null;
+    const sents = u.raw.split(/(?<=[。！？])/);
     return sents.length > 1 ? sents.map(s => `<p>${escapeHtml(removeMarkdown(s))}</p>`) : null;
   });
 
@@ -330,7 +342,12 @@ let _warmPage = null, _warmPageKey = null, _warmPageBrowser = null;
 function toText(v) {
   if (typeof v === 'string') return v;
   if (v == null) return '';
-  if (Array.isArray(v)) return v.map(p => (p && typeof p === 'object') ? (p.text ?? p.content ?? '') : p).join('');
+  if (Array.isArray(v)) return v.map(toText).join('');
+  if (typeof v === 'object') {
+    // Pull the common text-bearing field out of an object instead of "[object Object]".
+    const t = v.text ?? v.content ?? v.message ?? v.body ?? v.value;
+    return t != null ? toText(t) : '';
+  }
   return String(v);
 }
 

@@ -632,6 +632,16 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   justify-content: center;
   font-size: 14px;
 }
+.card-preview .cp-p { margin: 0 0 0.5em; }
+.card-preview .cp-p:last-child { margin-bottom: 0; }
+.card-preview pre.code {
+  font-family: var(--mono); font-size: 0.82em; line-height: 1.5; letter-spacing: 0;
+  white-space: pre-wrap; word-break: break-word; text-align: left;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+  border-radius: 6px; padding: 8px 11px; margin: 0 0 0.5em;
+}
+.card-preview pre.code:last-child { margin-bottom: 0; }
 .card-preview .footer-preview {
   position: relative;
   margin-top: 14px;

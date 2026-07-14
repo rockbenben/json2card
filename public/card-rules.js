@@ -137,7 +137,32 @@ const CardRules = (() => {
     return inner;
   }
 
-  return { buildCardList, autoFitFontSize, coverPlateHTML, coverData, resetContentInner, AUTOFIT };
+  /**
+   * Split content into ordered units: fenced ``` code blocks stay atomic,
+   * everything else splits into paragraphs. Shared by export + preview so code
+   * blocks survive as monospace instead of being stripped to prose. A code unit
+   * keeps its fences in `raw` so a reconstructed page re-tokenizes correctly.
+   */
+  function splitUnits(text) {
+    const units = [];
+    const re = /```[^\n]*\n?[\s\S]*?```/g;
+    let last = 0, m;
+    const pushText = (s) => { for (const p of s.split(/\n{1,}/)) if (p.trim()) units.push({ raw: p, code: false }); };
+    while ((m = re.exec(String(text))) !== null) {
+      pushText(text.slice(last, m.index));
+      units.push({ raw: m[0], code: true });
+      last = re.lastIndex;
+    }
+    pushText(String(text).slice(last));
+    return units;
+  }
+
+  /** Extract the code text from a fenced ``` block (drops the fences + lang tag). */
+  function fenceBody(raw) {
+    return raw.replace(/^```[^\n]*\n?/, '').replace(/\n?```\s*$/, '');
+  }
+
+  return { buildCardList, autoFitFontSize, coverPlateHTML, coverData, resetContentInner, splitUnits, fenceBody, AUTOFIT };
 })();
 
 // Browser: expose as a window global so Puppeteer-injected pages and app.js

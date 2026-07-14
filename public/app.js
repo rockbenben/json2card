@@ -1076,13 +1076,17 @@ function createCardPreview(card, index, total, aspect, rawMsg = {}) {
   const flVal = resolveSlotClient(slots.footerLeft, cardObj, rawMsg);
   const frVal = resolveSlotClient(slots.footerRight, cardObj, rawMsg);
   const bodyText = bodyVal.length > 400 ? bodyVal.slice(0, 400) + '…' : bodyVal;
+  const bodyInner = (window.CardRules ? CardRules.splitUnits(bodyText) : [{ raw: bodyText, code: false }]).map(u => u.code
+    ? `<pre class="code">${escapeHtml(CardRules.fenceBody(u.raw))}</pre>`
+    : `<div class="cp-p">${escapeHtml(removeMarkdown(u.raw)).replace(/\n/g, '<br>')}</div>`
+  ).join('');
   const centered = p.textAlign === 'center';
   const wm = escapeHtml(currentConfig.watermark || '');
 
   el.innerHTML = `
     ${p.showQuoteMark ? `<span style="position:absolute;top:6px;${centered ? 'left:50%;transform:translateX(-50%);' : 'left:20px;'}font-size:52px;opacity:0.09;line-height:1;z-index:0;">\u201C</span>` : ''}
     ${badgeVal ? `<div class="pill-preview${centered ? ' centered' : ''}" style="font-family:${currentConfig.labelFont},sans-serif;">${escapeHtml(badgeVal)}</div>` : ''}
-    <div class="content-preview" style="text-align:${p.textAlign};line-height:${p.lineHeight};letter-spacing:${p.letterSpacing}px;font-family:${currentConfig.bodyFont},serif;"><span class="cp-inner">${escapeHtml(removeMarkdown(bodyText)).replace(/\n/g, '<br>')}</span></div>
+    <div class="content-preview" style="text-align:${p.textAlign};line-height:${p.lineHeight};letter-spacing:${p.letterSpacing}px;font-family:${currentConfig.bodyFont},serif;"><span class="cp-inner">${bodyInner}</span></div>
     <div class="footer-preview" style="${centered ? 'justify-content:center;gap:12px;' : ''}">
       <span>${escapeHtml(flVal)}</span>
       <span>${escapeHtml(frVal)}</span>
