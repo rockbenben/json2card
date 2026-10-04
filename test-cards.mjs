@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { getColorConfig, resolveSlot } from './generate.mjs';
+import { getColorConfig, resolveSlot, safeFileName, COLOR_PALETTE } from './generate.mjs';
 import { scanFonts, generateFontFaceCSS } from './fonts.mjs';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 
@@ -29,6 +29,45 @@ describe('getColorConfig', () => {
   it('applies overrides', () => {
     const c = getColorConfig({ role: 'character', characterId: 'Alice' }, { Alice: { gradientStart: '#ff0000' } });
     assert.equal(c.gradientStart, '#ff0000');
+  });
+
+  it('hides the badge for an unnamed speaker instead of an icon-only orphan', () => {
+    assert.equal(getColorConfig({ role: 'character', characterId: '' }).displayLabel, '');
+  });
+});
+
+describe('safeFileName', () => {
+  it('strips path-breaking characters and falls back on empty', () => {
+    assert.equal(safeFileName('a/b\\c:d'), 'a-b-c-d');
+    assert.equal(safeFileName(''), 'card');
+    assert.equal(safeFileName('...dots...'), 'dots');
+    assert.equal(safeFileName('x'.repeat(80)).length, 60);
+    assert.equal(safeFileName('  中文 名字  '), '中文 名字');
+  });
+});
+
+describe('COLOR_PALETTE', () => {
+  const hsv = hex => {
+    const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    let h = 0;
+    if (d) h = mx === r ? 60 * (((g - b) / d) % 6) : mx === g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4);
+    return [(h + 360) % 360, mx ? d / mx : 0, mx];
+  };
+  const dist = (a, b) => {
+    const [h1, s1, v1] = hsv(a.gradientStart), [h2, s2, v2] = hsv(b.gradientStart);
+    let dh = Math.abs(h1 - h2); if (dh > 180) dh = 360 - dh;
+    return Math.sqrt((dh / 180) ** 2 * 0.7 + (s1 - s2) ** 2 * 0.15 + (v1 - v2) ** 2 * 0.15);
+  };
+  const prefixMin = k => {
+    let m = Infinity;
+    for (let i = 0; i < k; i++) for (let j = i + 1; j < k; j++) m = Math.min(m, dist(COLOR_PALETTE[i], COLOR_PALETTE[j]));
+    return m;
+  };
+
+  it('keeps the first speakers distinguishable (farthest-point order)', () => {
+    assert.ok(prefixMin(4) >= 0.25, `first 4 too close: ${prefixMin(4).toFixed(2)}`);
+    assert.ok(prefixMin(8) >= 0.12, `first 8 too close: ${prefixMin(8).toFixed(2)}`);
   });
 });
 

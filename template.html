@@ -86,9 +86,9 @@ html, body {
 .pill:empty { display: none; }
 .deco { display: none; }
 .watermark {
-  position: absolute; bottom: 28px; right: 32px;
+  position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%);
   font-size: 16px; opacity: 0.25; letter-spacing: 1px;
-  color: {{TEXT_COLOR}}; pointer-events: none;
+  color: {{TEXT_COLOR}}; pointer-events: none; white-space: nowrap;
 }
 </style>
 <style id="card-css">{{STYLE_CSS}}</style>

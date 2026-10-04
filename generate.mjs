@@ -15,24 +15,27 @@ const { buildCardList } = CardRules;
 // User/topic card style (dark)
 export const USER_STYLE = { gradientStart: '#0c0c0c', gradientEnd: '#1a1a1a', textColor: '#f0e6d2', icon: '📜' };
 
-// 16-color palette — popular social media tones, each visually distinct
+// 16-color palette — ordered by greedy farthest-point so the FIRST k speakers
+// are maximally distinguishable (prefix-min distance: k4 0.02→0.32, k8 0.02→0.15).
+// Near-dupe families (peach≈terracotta, sand≈caramel, lake≈mint, ocean≈dusty blue)
+// were replaced with amber / mist-blue / olive / cobalt.
 export const COLOR_PALETTE = [
-  { gradientStart: '#c4836e', gradientEnd: '#a0604a' },  // 赤陶 terracotta
-  { gradientStart: '#7b9e89', gradientEnd: '#5a7e69' },  // 鼠尾草 sage
-  { gradientStart: '#8b7db8', gradientEnd: '#6a5d98' },  // 薰衣草 lavender
-  { gradientStart: '#c98a7a', gradientEnd: '#b0705e' },  // 蜜桃 peach
-  { gradientStart: '#5d8a9e', gradientEnd: '#3d6a7e' },  // 雾霾蓝 dusty blue
-  { gradientStart: '#b87a85', gradientEnd: '#985a65' },  // 豆沙粉 dusty rose
-  { gradientStart: '#5a8e8e', gradientEnd: '#3a6e6e' },  // 青色 teal
-  { gradientStart: '#9a7e5a', gradientEnd: '#7a5e3a' },  // 暖沙 warm sand
-  { gradientStart: '#8e6a7a', gradientEnd: '#6e4a5a' },  // 藕紫 mauve
-  { gradientStart: '#6a8e6a', gradientEnd: '#4a6e4a' },  // 森林绿 forest
-  { gradientStart: '#7a8eaa', gradientEnd: '#5a6e8a' },  // 海洋蓝 ocean blue
-  { gradientStart: '#8a5a5a', gradientEnd: '#6a3a3a' },  // 酒红 burgundy
-  { gradientStart: '#6aaa9a', gradientEnd: '#4a8a7a' },  // 薄荷 mint
-  { gradientStart: '#aa8a6a', gradientEnd: '#8a6a4a' },  // 焦糖 caramel
-  { gradientStart: '#7a6a8e', gradientEnd: '#5a4a6e' },  // 梅子 plum
-  { gradientStart: '#6a9a8a', gradientEnd: '#4a7a6a' },  // 湖绿 lake green
+  { gradientStart: '#c4836e', gradientEnd: '#915b4a' },  // 赤陶 terracotta
+  { gradientStart: '#5d8a9e', gradientEnd: '#3f6475' },  // 雾霾蓝 dusty blue
+  { gradientStart: '#6a8e6a', gradientEnd: '#4b694b' },  // 森林绿 forest
+  { gradientStart: '#7a6a8e', gradientEnd: '#594b69' },  // 梅子 plum
+  { gradientStart: '#8f9448', gradientEnd: '#696e2f' },  // 橄榄 olive
+  { gradientStart: '#8e6a7a', gradientEnd: '#694b59' },  // 藕紫 mauve
+  { gradientStart: '#6aaa9a', gradientEnd: '#497e71' },  // 薄荷 mint
+  { gradientStart: '#c9973f', gradientEnd: '#956b22' },  // 琥珀 amber
+  { gradientStart: '#767c87', gradientEnd: '#545963' },  // 板岩灰 slate
+  { gradientStart: '#8a5a5a', gradientEnd: '#663e3e' },  // 酒红 burgundy
+  { gradientStart: '#7b9e89', gradientEnd: '#587564' },  // 鼠尾草 sage
+  { gradientStart: '#8b7db8', gradientEnd: '#635788' },  // 薰衣草 lavender
+  { gradientStart: '#b87a85', gradientEnd: '#88555e' },  // 豆沙粉 dusty rose
+  { gradientStart: '#aa8a6a', gradientEnd: '#7e6349' },  // 焦糖 caramel
+  { gradientStart: '#5277a8', gradientEnd: '#35547c' },  // 钴蓝 cobalt
+  { gradientStart: '#5a8e8e', gradientEnd: '#3e6969' },  // 青色 teal
 ];
 
 // 16 icons — one per palette color, no duplicates within 16 characters
@@ -62,7 +65,7 @@ export const CARD_SIZES = {
 
 export const DEFAULT_SLOTS = {
   badge: 'displayLabel', body: 'content',
-  footerLeft: 'text:Legend Talk', footerRight: 'pageIndicator',
+  footerLeft: 'text:', footerRight: 'pageIndicator',
 };
 
 // Visual style parameters — all individually adjustable in Web UI
@@ -89,7 +92,7 @@ export const CARD_STYLES = {
 };
 
 export const PRESETS = {
-  roundtable: { label: '圆桌讨论', slots: { ...DEFAULT_SLOTS }, coverTitle: 'Legend Talk', cardStyle: 'classic' },
+  roundtable: { label: '圆桌讨论', slots: { ...DEFAULT_SLOTS }, coverTitle: '', cardStyle: 'classic' },
   quote:      { label: '语录卡片', slots: { badge: 'name', body: 'content', footerLeft: 'text:—', footerRight: 'characterId' }, coverTitle: '语录', cardStyle: 'quote' },
   note:       { label: '笔记卡片', slots: { badge: 'label', body: 'content', footerLeft: 'pageIndicator', footerRight: 'text:' }, coverTitle: '笔记', cardStyle: 'gentle' },
   news:       { label: '新闻摘要', slots: { badge: 'displayLabel', body: 'content', footerLeft: 'text:摘要', footerRight: 'pageIndicator' }, coverTitle: '新闻摘要', cardStyle: 'magazine' },
@@ -97,7 +100,7 @@ export const PRESETS = {
 
 const DEFAULT_CONFIG = {
   bodyFont: "'Noto Serif SC'", labelFont: "'Noto Sans SC'",
-  fontSize: 28, cardSize: '3:4', coverTitle: 'Legend Talk',
+  fontSize: 28, cardSize: '3:4', coverTitle: '',
   colorOverrides: {}, slots: { ...DEFAULT_SLOTS },
   cardStyle: 'classic', styleParams: { ...STYLE_DEFAULTS },
   watermark: '', coverExcludeRoles: ['Moderator'],
@@ -116,7 +119,8 @@ export function getColorConfig(msg, colorOverrides = {}, charIndex = -1) {
     : getCharStyle(charId, charIndex);
   const key = msg.role === 'user' ? '_user' : charId;
   const merged = colorOverrides[key] ? { ...base, ...colorOverrides[key] } : base;
-  return { ...merged, displayLabel: `${merged.icon} ${merged.label}` };
+  // displayLabel needs a name — an empty label must not leave an icon-only orphan pill
+  return { ...merged, displayLabel: merged.label ? `${merged.icon} ${merged.label}` : '' };
 }
 
 /** Escape HTML to prevent XSS in Puppeteer rendering */
@@ -163,6 +167,20 @@ export function resolveSlot(source, card, rawMsg = {}, raw = false) {
 
 // ── Template ──
 
+// Arabic & Hebrew runs must not get tracking — it breaks joined script
+const RTL_RUN = /[\u0590-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;
+
+// Filesystem-safe single path segment for export filenames
+export function safeFileName(s, fallback = 'card') {
+  const cleaned = String(s ?? '')
+    .replace(/[\\/:*?"<>|\x00-\x1f]/g, '-')
+    .replace(/\s+/g, ' ')
+    .replace(/-{2,}/g, '-')
+    .replace(/^[-.\s]+|[-.\s]+$/g, '')
+    .slice(0, 60);
+  return cleaned || fallback;
+}
+
 function buildCardCSS(card, config) {
   const p = { ...STYLE_DEFAULTS, ...config.styleParams };
   const brand = config.brandBg || '';  // solid brand background overrides gradient
@@ -170,13 +188,16 @@ function buildCardCSS(card, config) {
   const gradStart = brand || (p.gradientReverse ? card.gradientEnd : card.gradientStart);
   const gradEnd = brand || (p.gradientReverse ? card.gradientStart : card.gradientEnd);
   const centered = p.textAlign === 'center';
+  const rtlBody = RTL_RUN.test(card.content || '');
+  const rtlBadge = RTL_RUN.test(card.displayLabel || card.label || '');
   return `
     .card { background: linear-gradient(${p.gradientAngle}deg, ${gradStart}, ${gradEnd}); border-radius: ${p.borderRadius}px; color: ${tc}; }
     .noise { opacity: ${p.noiseOpacity / 100}; }
     .glow-tr { background: radial-gradient(circle, rgba(255,255,255,${p.glowIntensity / 100}) 0%, transparent 70%); }
     .glow-bl { background: radial-gradient(circle, rgba(255,255,255,${p.glowIntensity / 200}) 0%, transparent 70%); }
     ${centered ? '.pill { align-self: center; } .pill::before { display: none; }' : ''}
-    .content p { text-align: ${p.textAlign}; line-height: ${p.lineHeight}; letter-spacing: ${p.letterSpacing}px; }
+    ${rtlBadge ? '.pill { letter-spacing: 0; }' : ''}
+    .content p { text-align: ${p.textAlign}; line-height: ${p.lineHeight}; letter-spacing: ${rtlBody ? 0 : p.letterSpacing}px; }
     ${centered ? '.footer { justify-content: center; gap: 24px; }' : ''}
     ${p.showQuoteMark ? `.deco { display: block; position: absolute; top: 40px; ${centered ? 'left: 50%; transform: translateX(-50%);' : 'left: 68px;'} font-size: 150px; opacity: 0.07; color: ${tc}; line-height: 1; z-index: 0; } .deco::before { content: "\\201C"; }` : ''}
   `;
@@ -221,11 +242,11 @@ function buildCoverCard(data, config) {
   const { summary, names, kicker } = CardRules.coverData(data.messages, data.characters, config);
   return {
     gradientStart: '#0c0c0c', gradientEnd: '#1a1a1a', textColor: '#f0e6d2',
-    label: '', name: '封面', suffix: '', _isHtml: true,
+    label: '', name: 'cover', suffix: '', _isHtml: true,
     // Title plate — the first slide viewers see. Shared with the web preview.
     content: CardRules.coverPlateHTML({
       kicker,
-      title: escapeHtml(config.coverTitle || ''),
+      title: escapeHtml(config.coverTitle || data.title || ''),
       summary: escapeHtml(summary),
       names: escapeHtml(names),
       textColor: config.brandText || '#f0e6d2',
@@ -356,9 +377,23 @@ function toText(v) {
 function normalizeMessages(data) {
   if (!data?.messages?.length) return data;
   const first = data.messages[0];
-  // Object format — coerce content to string (callers may send arrays/numbers).
+  // Object format — coerce content to string (callers may send arrays/numbers),
+  // and derive the speaker id when a raw API payload omits it (role/name), so
+  // badges and filenames don't silently lose the name.
   if (!Array.isArray(first)) {
-    return { ...data, messages: data.messages.map(m => (m && typeof m === 'object') ? { ...m, content: toText(m.content) } : m) };
+    const messages = data.messages.map(m => {
+      if (!m || typeof m !== 'object') return m;
+      const mm = { ...m, content: toText(m.content) };
+      if (mm.role !== 'user' && mm.characterId == null) mm.characterId = mm.name || mm.role || '';
+      return mm;
+    });
+    let characters = Array.isArray(data.characters) ? data.characters : null;
+    if (!characters) {
+      const hiddenSet = new Set(HIDDEN_ROLES);
+      characters = [...new Set(messages.filter(m => m && m.role !== 'user').map(m => m.characterId))]
+        .filter(id => id && !hiddenSet.has(String(id).toLowerCase()));
+    }
+    return { ...data, messages, characters };
   }
   const userRole = 'You';
   const messages = data.messages.map(m => {
@@ -379,6 +414,9 @@ function normalizeMessages(data) {
 export async function renderCardsFromData(data, config = {}, templatePath, fontsDir, browser = null) {
   data = normalizeMessages(data);
   const cfg = { ...DEFAULT_CONFIG, ...config };
+  // cardStyle params apply underneath EXPLICIT styleParams only — DEFAULT_CONFIG's
+  // built-in styleParams must not out-vote the caller's style choice.
+  cfg.styleParams = { ...STYLE_DEFAULTS, ...(CARD_STYLES[cfg.cardStyle]?.params || {}), ...(config.styleParams || {}) };
 
   // Cached I/O
   if (_templatePath !== templatePath) { _templateCache = await fs.readFile(templatePath, 'utf-8'); _templatePath = templatePath; }
@@ -480,7 +518,7 @@ export async function renderCardsFromData(data, config = {}, templatePath, fonts
         document.querySelector('.watermark').style.color = tc;
       }, d);
       const buffer = await page.screenshot({ omitBackground: true, encoding: 'binary' });
-      results.push({ filename: `card-${String(card.index).padStart(2, '0')}-${card.name}${card.suffix}.png`, buffer: Buffer.from(buffer) });
+      results.push({ filename: `card-${String(card.index).padStart(2, '0')}-${safeFileName(card.name)}${card.suffix}.png`, buffer: Buffer.from(buffer) });
     }
 
     // Don't close page — keep warm for next render

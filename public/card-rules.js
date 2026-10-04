@@ -4,7 +4,7 @@
  * Node:    loaded via Function() wrapper in generate.mjs
  */
 const CardRules = (() => {
-  const SUMMARY_LABEL = { label: '· · ·', name: 'Summary', displayLabel: '· · ·' };
+  const SUMMARY_LABEL = { label: 'Summary', name: 'Summary', displayLabel: 'Summary' };
 
   /**
    * Build card descriptors from messages — single source of truth for card rules.
@@ -36,8 +36,9 @@ const CardRules = (() => {
         ? { ...dark, ...SUMMARY_LABEL }
         : getColor(msg, charIndexMap[msg.characterId] ?? -1);
 
-      // User → hide badge
-      const dl = msg.role === 'user' ? '' : color.displayLabel;
+      // User → hide badge; an unnamed speaker's icon-only label would leave an
+      // orphan pill, so trim to nothing and let .pill:empty hide it.
+      const dl = msg.role === 'user' ? '' : String(color.displayLabel || '').trim();
 
       cards.push({ ...color, label: dl, displayLabel: dl, content: msg.content, _rawMsg: msg });
     });
@@ -63,9 +64,11 @@ const CardRules = (() => {
     inner.style.minHeight = '0'; // measure NATURAL height (wrapper otherwise fills)
     const base = parseFloat(getComputedStyle(inner).fontSize) || 28;
     if (inner.scrollHeight < boxH * AUTOFIT.trigger) {
+      // Code blocks must not ride the prose zoom — cap bodies that contain one
+      const maxScale = inner.querySelector('pre.code') ? 1.4 : AUTOFIT.maxScale;
       const cap = Math.min(boxH * AUTOFIT.target, boxH - AUTOFIT.edge);
       const fitsAt = (fs) => { inner.style.fontSize = fs + 'px'; return inner.scrollHeight <= cap; };
-      let lo = base, hi = base * AUTOFIT.maxScale, best = base;
+      let lo = base, hi = base * maxScale, best = base;
       for (let i = 0; i < 12 && hi - lo > 0.5; i++) {
         const mid = (lo + hi) / 2;
         if (fitsAt(mid)) { best = mid; lo = mid; } else { hi = mid; }
@@ -94,8 +97,8 @@ const CardRules = (() => {
     <span>${o.kicker}</span>
   </div>
   <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
-    <div style="font-size:${px(62)}px;line-height:1.22;letter-spacing:${px(1)}px;font-weight:600;margin-bottom:${px(38)}px;${label}">${o.title}</div>
-    <div style="width:${px(56)}px;height:${Math.max(1.5, px(2))}px;background:currentColor;opacity:0.35;margin-bottom:${px(38)}px;"></div>
+    ${o.title && o.title.trim() ? `<div style="font-size:${px(62)}px;line-height:1.22;letter-spacing:${px(1)}px;font-weight:600;margin-bottom:${px(38)}px;${label}">${o.title}</div>
+    <div style="width:${px(56)}px;height:${Math.max(1.5, px(2))}px;background:currentColor;opacity:0.35;margin-bottom:${px(38)}px;"></div>` : ''}
     <div style="font-size:${px(30)}px;line-height:1.95;opacity:0.74;font-family:${o.bodyFont},'Noto Serif SC',serif;">${o.summary}</div>
   </div>
   <div style="font-size:${px(22)}px;line-height:1.7;letter-spacing:${px(2)}px;opacity:0.5;">${o.names}</div>
@@ -117,7 +120,7 @@ const CardRules = (() => {
     const kept = (characters || []).filter(id => !excludeSet.has(String(id).toLowerCase()));
     const names = kept.map(id => overrides[id]?.name || id).join('  ·  ');
     const voiceCount = kept.length;
-    return { summary, names, voiceCount, kicker: voiceCount ? `${voiceCount} · VOICES` : 'PROOF' };
+    return { summary, names, voiceCount, kicker: voiceCount ? `${voiceCount} VOICES` : 'PROOF' };
   }
 
   /**
