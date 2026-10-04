@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Turn any JSON into clean, on-brand shareable cards — chat exports (ChatGPT, Claude, Slack, Discord, Telegram) auto-detected. Customize colors and fonts; export via Web, CLI, or API.">
   <title>json2card — chat exports & JSON into shareable cards</title>
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
   <header>
@@ -37,17 +37,15 @@
       <section class="input-section">
         <h2 data-i18n="dataInput"></h2>
         <div class="input-actions">
-          <label class="upload-btn">
-            <span data-i18n="uploadJson"></span>
-            <input type="file" id="fileInput" accept=".json" hidden>
-          </label>
+          <button type="button" id="uploadBtn" class="upload-btn" data-i18n="uploadJson"></button>
           <button id="loadExample" data-i18n="loadExample"></button>
         </div>
+        <input type="file" id="fileInput" accept=".json" hidden>
         <textarea id="jsonInput" data-i18n-placeholder="jsonPlaceholder"></textarea>
       </section>
 
       <section class="mapping-section">
-        <h2><span data-i18n="mappingRules"></span><button id="toggleMapping" class="toggle-btn">▶</button></h2>
+        <h2><span data-i18n="mappingRules"></span><button id="toggleMapping" class="toggle-btn" aria-expanded="false">▶</button></h2>
         <div id="mappingPanel" class="collapsed">
           <div style="margin-bottom:10px;">
             <label><span data-i18n="detectedFormat"></span> <select id="formatSelect"></select></label>
@@ -94,7 +92,7 @@
         <div class="slot-row">
           <span class="slot-label" data-i18n="slotFooterLeft"></span>
           <select id="slotFooterLeft"></select>
-          <input type="text" id="slotFooterLeftText" class="slot-text" data-i18n-placeholder="customText" value="Legend Talk">
+          <input type="text" id="slotFooterLeftText" class="slot-text" data-i18n-placeholder="customText">
         </div>
         <div class="slot-row">
           <span class="slot-label" data-i18n="slotFooterRight"></span>
@@ -116,16 +114,14 @@
             <label><span data-i18n="brandText"></span> <input type="color" id="brandTextColor" value="#e2e8f0"></label>
           </div>
         </div>
-        <label><span data-i18n="coverTitle"></span> <input type="text" id="coverTitle" value="Legend Talk"></label>
+        <label><span data-i18n="coverTitle"></span> <input type="text" id="coverTitle" data-i18n-placeholder="coverTitlePlaceholder"></label>
         <label><span data-i18n="coverExcludeRoles"></span> <input type="text" id="coverExcludeRoles" data-i18n-placeholder="coverExcludeRolesPlaceholder"></label>
         <label><span data-i18n="watermark"></span> <input type="text" id="watermark" data-i18n-placeholder="watermarkPlaceholder"></label>
         <label><span data-i18n="fontPairing"></span> <select id="fontPairing"></select></label>
         <label><span data-i18n="bodyFont"></span> <select id="bodyFont"></select></label>
         <label><span data-i18n="labelFont"></span> <select id="labelFont"></select></label>
-        <label><span data-i18n="uploadFont"></span>
-          <button type="button" id="fontUploadBtn" class="detect-btn" style="width:auto;margin-top:0;" data-i18n="uploadFontBtn"></button>
-          <input type="file" id="fontUpload" accept=".ttf,.otf,.woff,.woff2" hidden>
-        </label>
+        <span class="cfg-line"><span data-i18n="uploadFont"></span><button type="button" id="fontUploadBtn" class="detect-btn" style="width:auto;margin-top:0;" data-i18n="uploadFontBtn"></button></span>
+        <input type="file" id="fontUpload" accept=".ttf,.otf,.woff,.woff2" hidden>
         <label><span data-i18n="fontSize"></span> <input type="range" id="fontSize" min="24" max="36" value="28"> <span id="fontSizeValue">28px</span></label>
         <label><span data-i18n="cardStyle"></span> <select id="cardStyleSelect"></select></label>
         <div id="styleGallery" class="style-gallery"></div>
@@ -167,7 +163,7 @@
         <span>Proof Sheet</span>
         <span id="proofMeta"></span>
       </div>
-      <div id="previewCards" class="cards-grid">
+      <div id="previewCards" class="cards-grid is-empty">
         <p class="empty" data-i18n="previewHint"></p>
       </div>
       <div class="export-bar">
@@ -179,8 +175,8 @@
   </main>
 
   <script src="/vendor/remove-markdown.js"></script>
-  <script src="i18n.js?v=2"></script>
-  <script src="card-rules.js?v=2"></script>
-  <script src="app.js?v=8"></script>
+  <script src="i18n.js?v=3"></script>
+  <script src="card-rules.js?v=4"></script>
+  <script src="app.js?v=10"></script>
 </body>
 </html>

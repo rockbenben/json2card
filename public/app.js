@@ -13,12 +13,12 @@ let currentConfig = {
   labelFont: "'Noto Sans SC'",
   fontSize: 28,
   cardSize: '3:4',
-  coverTitle: '',  // set after i18n loads
+  coverTitle: '',  // empty = the cover uses the JSON's own title
   colorOverrides: {},
   slots: {
     badge: 'displayLabel',
     body: 'content',
-    footerLeft: 'text:',  // set after i18n loads
+    footerLeft: 'text:',
     footerRight: 'pageIndicator',
   },
   cardStyle: 'classic',
@@ -49,6 +49,17 @@ function escapeHtml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// Mirror of generate.mjs safeFileName — download names must be filesystem-safe too
+function safeFileName(s, fallback = 'cards') {
+  const cleaned = String(s ?? '')
+    .replace(/[\\/:*?"<>|\x00-\x1f]/g, '-')
+    .replace(/\s+/g, ' ')
+    .replace(/-{2,}/g, '-')
+    .replace(/^[-.\s]+|[-.\s]+$/g, '')
+    .slice(0, 60);
+  return cleaned || fallback;
+}
+
 if (typeof removeMarkdown === 'undefined') {
   window.removeMarkdown = function(s) { return s; };
 }
@@ -56,22 +67,22 @@ if (typeof removeMarkdown === 'undefined') {
 // Style constants — loaded from server, with inline fallbacks
 let USER_STYLE = { gradientStart: '#0c0c0c', gradientEnd: '#1a1a1a', textColor: '#f0e6d2', icon: '📜' };
 let COLOR_PALETTE = [
-  { gradientStart: '#c4836e', gradientEnd: '#a0604a' },
-  { gradientStart: '#7b9e89', gradientEnd: '#5a7e69' },
-  { gradientStart: '#8b7db8', gradientEnd: '#6a5d98' },
-  { gradientStart: '#c98a7a', gradientEnd: '#b0705e' },
-  { gradientStart: '#5d8a9e', gradientEnd: '#3d6a7e' },
-  { gradientStart: '#b87a85', gradientEnd: '#985a65' },
-  { gradientStart: '#5a8e8e', gradientEnd: '#3a6e6e' },
-  { gradientStart: '#9a7e5a', gradientEnd: '#7a5e3a' },
-  { gradientStart: '#8e6a7a', gradientEnd: '#6e4a5a' },
-  { gradientStart: '#6a8e6a', gradientEnd: '#4a6e4a' },
-  { gradientStart: '#7a8eaa', gradientEnd: '#5a6e8a' },
-  { gradientStart: '#8a5a5a', gradientEnd: '#6a3a3a' },
-  { gradientStart: '#6aaa9a', gradientEnd: '#4a8a7a' },
-  { gradientStart: '#aa8a6a', gradientEnd: '#8a6a4a' },
-  { gradientStart: '#7a6a8e', gradientEnd: '#5a4a6e' },
-  { gradientStart: '#6a9a8a', gradientEnd: '#4a7a6a' },
+  { gradientStart: '#c4836e', gradientEnd: '#915b4a' },
+  { gradientStart: '#5d8a9e', gradientEnd: '#3f6475' },
+  { gradientStart: '#6a8e6a', gradientEnd: '#4b694b' },
+  { gradientStart: '#7a6a8e', gradientEnd: '#594b69' },
+  { gradientStart: '#8f9448', gradientEnd: '#696e2f' },
+  { gradientStart: '#8e6a7a', gradientEnd: '#694b59' },
+  { gradientStart: '#6aaa9a', gradientEnd: '#497e71' },
+  { gradientStart: '#c9973f', gradientEnd: '#956b22' },
+  { gradientStart: '#767c87', gradientEnd: '#545963' },
+  { gradientStart: '#8a5a5a', gradientEnd: '#663e3e' },
+  { gradientStart: '#7b9e89', gradientEnd: '#587564' },
+  { gradientStart: '#8b7db8', gradientEnd: '#635788' },
+  { gradientStart: '#b87a85', gradientEnd: '#88555e' },
+  { gradientStart: '#aa8a6a', gradientEnd: '#7e6349' },
+  { gradientStart: '#5277a8', gradientEnd: '#35547c' },
+  { gradientStart: '#5a8e8e', gradientEnd: '#3e6969' },
 ];
 let CHAR_ICONS = ['🎭', '🔥', '🌊', '⚡', '🌿', '🎵', '🔮', '⭐', '💎', '📖', '🏛', '🎯', '🌸', '🦋', '🍂', '🪶'];
 let FIXED_ICONS = { moderator: '🎙️' };
@@ -100,6 +111,7 @@ const SLOT_MAP = [['slotBadge', 'badge'], ['slotBody', 'body'], ['slotFooterLeft
 // ── Init ──
 
 async function init() {
+  if ((localStorage.getItem('theme') || 'dark') === 'light') document.documentElement.setAttribute('data-theme', 'light');
   applyI18n();
   await loadServerConfig();
   await loadFonts();
@@ -121,16 +133,13 @@ function applyI18n() {
   });
   document.title = t('title');
   $('#langSelect').value = currentLang;
+  $('#langSelect').title = t('language');
+  $('#langSelect').setAttribute('aria-label', t('language'));
+  $('#toggleMapping').setAttribute('aria-label', t('mappingRules'));
+  renderThemeBtn();
 
-  // Set language-aware defaults (only if not already customized by user)
-  if (!currentConfig.coverTitle) {
-    currentConfig.coverTitle = t('defaultCoverTitle');
-    $('#coverTitle').value = currentConfig.coverTitle;
-  }
+  // Cover title defaults to the data's own title (placeholder guides the user)
   $('#coverExcludeRoles').value = (currentConfig.coverExcludeRoles || []).join(', ');
-  if (currentConfig.slots.footerLeft === 'text:') {
-    currentConfig.slots.footerLeft = 'text:' + t('defaultFooterLeft');
-  }
 
   // Re-populate style dropdown with translated labels
   const styleMap = { classic: 'styleClassic', gentle: 'styleGentle', texture: 'styleTexture', quote: 'styleQuote', magazine: 'styleMagazine', elegant: 'styleElegant' };
@@ -352,6 +361,18 @@ function handleFontUpload(e) {
   reader.readAsDataURL(file);
 }
 
+// ── Theme button (sun/moon, state-aware) ──
+const SUN_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+const MOON_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+function renderThemeBtn() {
+  const light = document.documentElement.getAttribute('data-theme') === 'light';
+  const btn = $('#themeToggle');
+  btn.innerHTML = light ? SUN_SVG : MOON_SVG;
+  btn.setAttribute('aria-pressed', String(light));
+  btn.title = t('theme');
+  btn.setAttribute('aria-label', t('theme'));
+}
+
 // ── Events ──
 
 function bindEvents() {
@@ -381,14 +402,14 @@ function bindEvents() {
   $('#clearHistory').addEventListener('click', () => { localStorage.removeItem('cardHistory'); loadHistory(); });
 
   // Theme toggle
-  const savedTheme = localStorage.getItem('theme') || 'dark';
-  if (savedTheme === 'light') document.documentElement.setAttribute('data-theme', 'light');
   $('#themeToggle').addEventListener('click', () => {
     const isLight = document.documentElement.getAttribute('data-theme') === 'light';
     document.documentElement.setAttribute('data-theme', isLight ? '' : 'light');
     localStorage.setItem('theme', isLight ? 'dark' : 'light');
+    renderThemeBtn();
   });
 
+  $('#uploadBtn').addEventListener('click', () => $('#fileInput').click());
   $('#fileInput').addEventListener('change', handleFileUpload);
   $('#loadExample').addEventListener('click', loadExample);
   $('#jsonInput').addEventListener('input', debounce(handleJsonChange, 500));
@@ -397,11 +418,11 @@ function bindEvents() {
     if (key && PRESETS[key]) {
       const slots = { ...PRESETS[key].slots };
       // Translate preset footer text
-      if (slots.footerLeft === 'text:Legend Talk') slots.footerLeft = 'text:' + t('defaultFooterLeft');
       if (slots.footerLeft === 'text:摘要') slots.footerLeft = 'text:' + t('footerSummary');
       currentConfig.slots = slots;
-      const coverI18n = { roundtable: 'defaultCoverTitle', quote: 'coverQuote', note: 'coverNote', news: 'coverNews' };
-      currentConfig.coverTitle = t(coverI18n[key] || 'defaultCoverTitle');
+      // roundtable derives its cover title from the data itself
+      const coverI18n = { quote: 'coverQuote', note: 'coverNote', news: 'coverNews' };
+      currentConfig.coverTitle = coverI18n[key] ? t(coverI18n[key]) : '';
       $('#coverTitle').value = currentConfig.coverTitle;
       if (PRESETS[key].cardStyle) {
         currentConfig.cardStyle = PRESETS[key].cardStyle;
@@ -478,14 +499,18 @@ function bindEvents() {
       else if (type === 'bool') currentConfig.styleParams[key] = el.value === 'true';
       else currentConfig.styleParams[key] = el.value;
       syncStyleParamLabels();
-      $('#presetSelect').value = '';
+      const ps = $('#presetSelect');
+      if (ps.value !== '') {
+        ps.value = '';
+        ps.classList.remove('flash'); void ps.offsetWidth; ps.classList.add('flash');
+      }
       updatePreview();
     });
   }
 
   // Save custom preset to localStorage
   $('#saveCustomPreset').addEventListener('click', () => {
-    const name = prompt(t('presetNamePrompt'));
+    const name = (prompt(t('presetNamePrompt')) || '').trim().slice(0, 40);
     if (!name) return;
     const customs = JSON.parse(localStorage.getItem('customPresets') || '{}');
     customs[name] = { ...currentConfig.styleParams };
@@ -502,9 +527,11 @@ function bindEvents() {
     if (panel.classList.contains('collapsed')) {
       panel.classList.replace('collapsed', 'expanded');
       btn.textContent = '▼';
+      btn.setAttribute('aria-expanded', 'true');
     } else {
       panel.classList.replace('expanded', 'collapsed');
       btn.textContent = '▶';
+      btn.setAttribute('aria-expanded', 'false');
     }
   });
 
@@ -841,20 +868,33 @@ function updateFormatUI() {
   const sel = $('#formatSelect');
   sel.innerHTML = `<option value="">${t('fmtAutoDetect')}</option>` +
     FORMAT_TEMPLATES.map(f => `<option value="${f.id}" ${detectedFormat?.id === f.id ? 'selected' : ''}>${t(f.i18nLabel)}</option>`).join('');
+  const hint = $('#formatHint');
   if (detectedFormat) {
     const label = t(detectedFormat.i18nLabel);
-    const hint = t(detectedFormat.i18nHint);
-    $('#formatHint').textContent = t('formatDetected', { label, hint });
-    $('#formatHint').style.color = '#5a8a5a';
+    const hintTxt = t(detectedFormat.i18nHint);
+    hint.textContent = t('formatDetected', { label, hint: hintTxt });
+    hint.classList.add('ok');
   } else {
-    $('#formatHint').textContent = t('formatUnknown');
-    $('#formatHint').style.color = '';
+    hint.textContent = t('formatUnknown');
+    hint.classList.remove('ok');
+  }
+  // Array-mode data has no role/content/charId fields — grey them out instead
+  // of showing defaults that would silently do nothing.
+  const arr = !!detectedFormat?.arrayMode;
+  for (const id of ['mapContent', 'mapRole', 'mapCharId']) {
+    const el = $('#' + id);
+    el.disabled = arr;
+    el.style.opacity = arr ? '.45' : '';
   }
 }
 
 function normalizeAndPreview() {
   currentData = normalizeJson(rawJson);
-  if (!currentData) { clearPreview(); return; }
+  if (!currentData) {
+    updateFormatUI();
+    showNotice(t('noArrayFound'));
+    return;
+  }
   updateFormatUI();
   populateSlotDropdowns();
   buildCharacterColorPanel();
@@ -941,7 +981,7 @@ function buildCharacterColorPanel() {
   const container = $('#characterColors');
   if (!currentData?.characters) { container.innerHTML = ''; return; }
 
-  container.innerHTML = `<h3 style="font-size:12px;color:#666;margin-bottom:8px;">${t('charColors')}</h3>`;
+  container.innerHTML = `<h3 class="char-head">${t('charColors')}</h3>`;
 
   for (let ci = 0; ci < currentData.characters.length; ci++) {
     const id = currentData.characters[ci];
@@ -976,7 +1016,7 @@ function getColorForMsg(msg, charIndex = -1) {
   const base = isUser ? { ...USER_STYLE, label: 'You', name: 'You' } : getCharStyle(msg.characterId, charIndex);
   const override = currentConfig.colorOverrides[isUser ? '_user' : msg.characterId];
   const merged = override ? { ...base, ...override } : base;
-  return { ...merged, displayLabel: `${merged.icon} ${merged.label}` };
+  return { ...merged, displayLabel: merged.label ? `${merged.icon} ${merged.label}` : '' };
 }
 
 // ── Brand theme (solid-color mode) ──
@@ -1042,6 +1082,14 @@ function setActiveStyleChip(key) {
 
 const _SW_NOISE = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
 
+// Style-chip swatches — each preset gets its own inky color so the six chips
+// are instantly distinguishable (the gradient itself stays per-card in output).
+const STYLE_SWATCH = {
+  classic:  ['#c4836e', '#a0604a'], gentle: ['#7b9e89', '#5a7e69'],
+  texture:  ['#9a7e5a', '#7a5e3a'], quote: ['#8b7db8', '#6a5d98'],
+  magazine: ['#5d8a9e', '#3d6a7e'], elegant: ['#b87a85', '#985a65'],
+};
+
 function renderStyleGallery() {
   const gal = $('#styleGallery');
   if (!gal) return;
@@ -1051,7 +1099,8 @@ function renderStyleGallery() {
   gal.innerHTML = Object.entries(CARD_STYLES).map(([k, v]) => {
     const p = { ...STYLE_DEFAULTS, ...(v.params || {}) };
     const r = Math.round((p.borderRadius ?? 40) * 0.42);
-    const [g1, g2] = p.gradientReverse ? ['#a0604a', '#c4836e'] : ['#c4836e', '#a0604a'];
+    const [a, b] = STYLE_SWATCH[k] || STYLE_SWATCH.classic;
+    const [g1, g2] = p.gradientReverse ? [b, a] : [a, b];
     const noise = Math.min(0.5, (p.noiseOpacity ?? 5) / 100 * 4.5).toFixed(2);
     const glow = Math.min(0.6, (p.glowIntensity ?? 0) / 100 * 3.2).toFixed(2);
     const center = p.textAlign === 'center' ? ' c' : '';
@@ -1079,6 +1128,8 @@ function renderStyleGallery() {
 let _fitTimer = null;  // debounce handle for the preview auto-fit pass
 function updatePreview() {
   if (!currentData?.messages) { clearPreview(); return; }
+  $('#previewCards').classList.remove('is-empty');
+  $('#jsonInput').classList.remove('invalid');
 
   const container = $('#previewCards');
   const aspect = getAspect(currentConfig.cardSize || '3:4');
@@ -1086,7 +1137,7 @@ function updatePreview() {
 
   // Cover card — a title plate; data + markup shared with the export via CardRules
   const cover = CardRules.coverData(currentData.messages, currentData.characters, currentConfig);
-  const coverTitle = currentConfig.coverTitle || t('defaultCoverTitle');
+  const coverTitle = currentConfig.coverTitle || currentData.title || '';
   const coverEl = createCardPreview({
     gradientStart: '#0c0c0c',
     gradientEnd: '#1a1a1a',
@@ -1108,9 +1159,9 @@ function updatePreview() {
     container.appendChild(el);
   });
 
-  const n = currentData.messages.length + 1;
-  $('#cardCount').textContent = t('previewCount', { n });
-  $('#proofMeta').textContent = `${n} cards · ${currentConfig.cardSize || '3:4'}`;
+  const nCards = 1 + cards.length;  // cover + rendered message cards — what the ZIP contains
+  $('#cardCount').textContent = t('previewCount', { n: nCards });
+  $('#proofMeta').textContent = t('cardsMeta', { n: nCards, size: currentConfig.cardSize || '3:4' });
   $('#exportBtn').disabled = false;
   $('#exportLongBtn').disabled = false;
 
@@ -1191,32 +1242,60 @@ function createCardPreview(card, index, total, aspect, rawMsg = {}) {
   ).join('');
   const centered = p.textAlign === 'center';
   const wm = escapeHtml(currentConfig.watermark || '');
+  // Mirror the export's no-tracking rule for Arabic/Hebrew runs
+  const RTL_RUN = /[\u0590-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;
+  const rtlBody = RTL_RUN.test(bodyText);
+  const rtlBadge = RTL_RUN.test(badgeVal);
+  // Texture/glow overlays mirror template.html so the sliders live-preview.
+  const noisePx = p.noiseOpacity > 0
+    ? `<svg class="pv-noise" style="opacity:${p.noiseOpacity / 100}" xmlns="http://www.w3.org/2000/svg"><filter id="pvNoise"><feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(#pvNoise)"/></svg>` : '';
+  const glowPx = p.glowIntensity > 0
+    ? `<div class="pv-glow-tr" style="background:radial-gradient(circle, rgba(255,255,255,${p.glowIntensity / 100}) 0%, transparent 70%)"></div><div class="pv-glow-bl" style="background:radial-gradient(circle, rgba(255,255,255,${p.glowIntensity / 200}) 0%, transparent 70%)"></div>` : '';
 
   el.innerHTML = `
+    ${noisePx}${glowPx}
     ${p.showQuoteMark ? `<span style="position:absolute;top:6px;${centered ? 'left:50%;transform:translateX(-50%);' : 'left:20px;'}font-size:52px;opacity:0.09;line-height:1;z-index:0;">\u201C</span>` : ''}
-    ${badgeVal ? `<div class="pill-preview${centered ? ' centered' : ''}" style="font-family:${currentConfig.labelFont},sans-serif;">${escapeHtml(badgeVal)}</div>` : ''}
-    <div class="content-preview" style="text-align:${p.textAlign};line-height:${p.lineHeight};letter-spacing:${p.letterSpacing}px;font-family:${currentConfig.bodyFont},serif;"><span class="cp-inner">${bodyInner}</span></div>
+    ${badgeVal ? `<div class="pill-preview${centered ? ' centered' : ''}" style="font-family:${currentConfig.labelFont},sans-serif;${rtlBadge ? 'letter-spacing:0;' : ''}">${escapeHtml(badgeVal)}</div>` : ''}
+    <div class="content-preview" style="text-align:${p.textAlign};line-height:${p.lineHeight};letter-spacing:${rtlBody ? 0 : p.letterSpacing}px;font-size:${currentConfig.fontSize / 2}px;font-family:${currentConfig.bodyFont},serif;"><span class="cp-inner">${bodyInner}</span></div>
     <div class="footer-preview" style="${centered ? 'justify-content:center;gap:12px;' : ''}">
       <span>${escapeHtml(flVal)}</span>
       <span>${escapeHtml(frVal)}</span>
     </div>
-    ${wm ? `<span style="position:absolute;bottom:8px;right:12px;font-size:8px;opacity:0.25;">${wm}</span>` : ''}
+    ${wm ? `<span style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);font-size:8px;opacity:0.25;white-space:nowrap;">${wm}</span>` : ''}
   `;
   cell.appendChild(el);
   return cell;
 }
 
 function clearPreview() {
-  $('#previewCards').innerHTML = `<p class="empty">${t('previewHint')}</p>`;
+  const grid = $('#previewCards');
+  grid.classList.add('is-empty');
+  grid.innerHTML = `<p class="empty">${t('previewHint')}</p>`;
   $('#cardCount').textContent = '';
   const pm = $('#proofMeta'); if (pm) pm.textContent = '';
+  $('#jsonInput').classList.remove('invalid');
+  $('#exportBtn').disabled = true;
+  $('#exportLongBtn').disabled = true;
+}
+
+function showNotice(msg) {
+  const grid = $('#previewCards');
+  grid.classList.add('is-empty');
+  grid.innerHTML = `<p class="empty notice">${escapeHtml(msg)}</p>`;
+  $('#cardCount').textContent = '';
+  const pm = $('#proofMeta'); if (pm) pm.textContent = '';
+  $('#jsonInput').classList.remove('invalid');
   $('#exportBtn').disabled = true;
   $('#exportLongBtn').disabled = true;
 }
 
 function showError(msg) {
-  $('#previewCards').innerHTML = `<p class="empty" style="color:#c0392b;">${msg}</p>`;
+  const grid = $('#previewCards');
+  grid.classList.add('is-empty');
+  grid.innerHTML = `<p class="empty err">${escapeHtml(msg)}</p>`;
   $('#cardCount').textContent = '';
+  const pm = $('#proofMeta'); if (pm) pm.textContent = '';
+  $('#jsonInput').classList.add('invalid');
   $('#exportBtn').disabled = true;
   $('#exportLongBtn').disabled = true;
 }
@@ -1228,6 +1307,7 @@ async function handleExport() {
 
   const btn = $('#exportBtn');
   btn.disabled = true;
+  $('#exportLongBtn').disabled = true;  // one render at a time
   btn.textContent = t('generating');
 
   try {
@@ -1243,7 +1323,7 @@ async function handleExport() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = (currentConfig.coverTitle || 'cards') + '.zip';
+    a.download = safeFileName(currentConfig.coverTitle) + '.zip';
     a.click();
     URL.revokeObjectURL(url);
 
@@ -1253,6 +1333,7 @@ async function handleExport() {
   } finally {
     btn.disabled = false;
     btn.textContent = t('exportZip');
+    if (currentData) $('#exportLongBtn').disabled = false;
   }
 }
 
@@ -1260,6 +1341,7 @@ async function handleExportLong() {
   if (!currentData) return;
   const btn = $('#exportLongBtn');
   btn.disabled = true;
+  $('#exportBtn').disabled = true;  // one render at a time
   btn.textContent = t('generating');
   try {
     const res = await fetch('/api/generate-long', {
@@ -1272,7 +1354,7 @@ async function handleExportLong() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = (currentConfig.coverTitle || 'cards') + '-long.png';
+    a.download = safeFileName(currentConfig.coverTitle) + '-long.png';
     a.click();
     URL.revokeObjectURL(url);
   } catch (err) {
@@ -1280,6 +1362,7 @@ async function handleExportLong() {
   } finally {
     btn.disabled = false;
     btn.textContent = t('exportLong');
+    if (currentData) $('#exportBtn').disabled = false;
   }
 }
 
@@ -1290,7 +1373,7 @@ function saveHistory() {
   const { customFonts, ...configForHistory } = currentConfig;  // don't persist multi-MB font data-URIs
   history.unshift({
     timestamp: new Date().toISOString(),
-    title: currentConfig.coverTitle,
+    title: currentConfig.coverTitle || currentData.title || t('defaultCoverFallback'),
     messageCount: currentData.messages.length,
     config: configForHistory,
     jsonMapping: { ...jsonMapping },
@@ -1315,18 +1398,20 @@ function loadHistory() {
 
   container.innerHTML = history.map((item, i) => `
     <div class="history-item" data-index="${i}">
-      <div>${item.title} (${t('msgCount', { n: item.messageCount })}) <span class="history-del" data-index="${i}" title="✕">✕</span></div>
+      <div>${escapeHtml(item.title || t('defaultCoverFallback'))} (${t('msgCount', { n: item.messageCount })}) <span class="history-del" role="button" tabindex="0" data-index="${i}" title="${escapeHtml(t('deleteItem'))}" aria-label="${escapeHtml(t('deleteItem'))}">✕</span></div>
       <div class="time">${new Date(item.timestamp).toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US')}</div>
     </div>
   `).join('');
 
   container.querySelectorAll('.history-del').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    const del = (e) => {
       e.stopPropagation();
       history.splice(+btn.dataset.index, 1);
       localStorage.setItem('cardHistory', JSON.stringify(history));
       loadHistory();
-    });
+    };
+    btn.addEventListener('click', del);
+    btn.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); del(e); } });
   });
 
   container.querySelectorAll('.history-item').forEach(el => {
@@ -1339,7 +1424,7 @@ function loadHistory() {
       currentData = item.jsonData;
 
       $('#jsonInput').value = JSON.stringify(rawJson, null, 2);
-      $('#coverTitle').value = currentConfig.coverTitle || t('defaultCoverTitle');
+      $('#coverTitle').value = currentConfig.coverTitle || '';
       $('#coverExcludeRoles').value = (currentConfig.coverExcludeRoles || []).join(', ');
       $('#watermark').value = currentConfig.watermark || '';
       $('#fontSize').value = currentConfig.fontSize;
