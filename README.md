@@ -2,11 +2,11 @@
 
 > Stop screenshotting chat threads — paste the export, get cards you can post
 
-**English** · [简体中文](README.zh.md)
+[⬇ Download](https://github.com/rockbenben/json2card/releases/latest) · [Self-host with Docker](#get-started) · [简体中文](README.zh.md)
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE) [![365 Open Source Plan #003](https://img.shields.io/badge/365%20Open%20Source%20Plan-%23003-1f6feb)](https://github.com/rockbenben/365opensource)
 
-Paste the raw export from Slack, ChatGPT or Claude — json2card works out the format on its own and lays the conversation out as cards you can actually post. No schema to define, no tidying up in Figma afterwards. Set your brand colours once, then drop the PNGs straight into a blog post, Notion, or a 16:9 slide deck.
+No schema to define and no tidying up in Figma afterwards: the format is figured out from the data itself, and your brand colours are set once for the whole set. The PNGs drop straight into a blog post, Notion, or a 16:9 slide deck.
 
 |                  Paste and lay it out                  |                    What comes out                     |
 | :----------------------------------------------------: | :---------------------------------------------------: |
@@ -17,9 +17,11 @@ Paste the raw export from Slack, ChatGPT or Claude — json2card works out the f
 - **Auto-detects any export** — ChatGPT, Claude, Telegram, Discord, Slack, or your own JSON. Multi-sample validation gets the structure right on the first try; for an odd shape, point at the fields with a one-line mapping.
 - **Make it yours before export** — Brand theme (one background + text color to match your blog or slide deck), upload your own font, 6 style presets in a visual gallery, 16-color palette, 5 sizes, watermark — no editing the PNG afterward.
 - **Handles messy input gracefully** — Long messages auto-paginate, nested / non-string content is coerced to text, fenced code blocks stay monospace, and markdown is stripped to clean prose. It degrades, it doesn't blow up the layout.
-- **Three ways to use** — Web UI for visual editing, CLI for batch jobs (no more one-off scripts), REST API for integration.
 - **Auto-fit typography** — Short quotes scale up to fill the frame; dense and paginated text keeps your chosen size.
-- **Fast & portable** — CORS-enabled API, file-based fonts + page reuse (~100ms per card on a warm server), one-command Docker deploy.
+- **Three ways to use** — Web UI for visual editing, CLI for batch jobs (no more one-off scripts), REST API for integration.
+
+> [!NOTE]
+> Everything renders on your own machine — the chat export never leaves it. Run the Docker image or `npm start` locally and point the browser at `localhost`; there is no account and no telemetry.
 
 ## Get Started
 
@@ -47,7 +49,7 @@ npm install && npm run setup-fonts && npm start
 | Format                      | Example                                     |
 | --------------------------- | ------------------------------------------- |
 | `[["speaker","text"], ...]` | Simple dialog list                          |
-| `{role, content}`           | OpenAI / Claude API (supports `name` field) |
+| `{role, content}`           | OpenAI / Claude API (speaker from `name`, else `role`) |
 | `{from, text}`              | Telegram export                             |
 | `{author.name, content}`    | Discord export                              |
 | `{user, text}`              | Slack export                                |
@@ -69,7 +71,7 @@ Chat is the sweet spot, but under the hood it's just _records → cards_: map an
 | **Colors**      | 16 auto-assigned muted tones, per-speaker override                                                      |
 | **Fonts**       | Auto-detected from `fonts/`, or upload one in the browser (data-URI embed; best for Latin/subset fonts) |
 | **Layout**      | 4 slots (header, body, footer left/right) x any field                                                   |
-| **Watermark**   | Custom text, bottom-right                                                                               |
+| **Watermark**   | Custom text, bottom-center                                                                                |
 | **Language**    | 18 UI languages, incl. right-to-left (Arabic)                                                           |
 | **Theme**       | Dark / Light                                                                                            |
 
@@ -139,7 +141,7 @@ node generate.mjs --body-font X  # custom font
 
 ## Config Reference
 
-All fields optional. Defaults used when omitted.
+All fields optional. Defaults used when omitted — notably `coverTitle` falls back to the JSON's own `title`, and `cardStyle` presets apply underneath any explicit `styleParams`.
 
 ```json
 {
@@ -179,6 +181,12 @@ All fields optional. Defaults used when omitted.
 | `PORT`       | `3000`  | Server port                                     |
 | `RATE_LIMIT` | `10`    | Max requests per minute per IP (`0` to disable) |
 
+## Limitations
+
+- Rendering drives headless Chromium (Puppeteer): the Docker image ships it; from source, first run downloads a browser.
+- Browser font upload embeds the file as a data URI — fine for Latin or subset fonts, capped at ~8 MB (full CJK families won't fit; install them under `fonts/` instead).
+- The API rate-limits to 10 requests/min per IP by default (`RATE_LIMIT=0` disables) — worth setting before you expose a public instance.
+
 ## Project Structure
 
 ```text
@@ -192,9 +200,11 @@ docker-compose.yml  — compose deploy
 ```
 
 ```bash
-npm test    # 11 tests
+npm test
 ```
 
 ## About the 365 Open Source Plan
 
-Project **#003** of the [365 Open Source Plan](https://github.com/rockbenben/365opensource) — one person + AI, 300+ open-source projects in a year. [Submit your idea →](https://365.aishort.top/) · [Discord](https://discord.gg/PZTQfJ4GjX) · [Telegram](https://t.me/aishort_top)
+Project **#003** of the [365 Open Source Plan](https://github.com/rockbenben/365opensource) — one person + AI, 300+ open-source projects in a year.
+
+[Submit your idea →](https://365.aishort.top/) · [Discord](https://discord.gg/PZTQfJ4GjX) · [Telegram](https://t.me/aishort_top)
