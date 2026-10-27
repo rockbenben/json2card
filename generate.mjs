@@ -2,9 +2,9 @@ import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import puppeteer from 'puppeteer';
 import { readFileSync } from 'node:fs';
 import removeMarkdown from 'remove-markdown';
+import { launchBrowser } from './launch-browser.mjs';
 import { scanFonts, generateFontFaceCSS } from './fonts.mjs';
 const _cardRulesSrc = readFileSync(new URL('./public/card-rules.js', import.meta.url), 'utf-8');
 const CardRules = new Function(_cardRulesSrc + '\nreturn CardRules;')();
@@ -437,7 +437,7 @@ export async function renderCardsFromData(data, config = {}, templatePath, fonts
   const size = CARD_SIZES[cfg.cardSize] || CARD_SIZES['3:4'];
 
   const ownBrowser = !browser;
-  if (!browser) browser = await puppeteer.launch({ args: ['--allow-file-access-from-files'] });
+  if (!browser) browser = await launchBrowser();
   try {
     const initCard = { gradientStart: '#0c0c0c', gradientEnd: '#1a1a1a', textColor: '#f0e6d2', content: '', _isHtml: true, index: 1, total: 1 };
     const initHtml = buildHtml(template, initCard, cfg, fontCSS);

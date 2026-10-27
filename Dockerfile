@@ -12,7 +12,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-COPY generate.mjs server.mjs fonts.mjs template.html ./
+COPY generate.mjs server.mjs launch-browser.mjs fonts.mjs template.html ./
 COPY public/ public/
 COPY fonts/ fonts/
 COPY test.json ./

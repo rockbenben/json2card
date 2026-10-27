@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import express from 'express';
 import { ZipArchive } from 'archiver';
-import puppeteer from 'puppeteer';
+import { launchBrowser } from './launch-browser.mjs';
 import { renderCardsFromData, USER_STYLE, COLOR_PALETTE, CHAR_ICONS, FIXED_ICONS, HIDDEN_ROLES, CARD_SIZES, CARD_STYLES, STYLE_DEFAULTS, DEFAULT_SLOTS, PRESETS } from './generate.mjs';
 import { scanFonts } from './fonts.mjs';
 
@@ -14,11 +14,19 @@ const FONTS_DIR = path.join(__dirname, 'fonts');
 let browser = null;
 async function getBrowser() {
   if (!browser || !browser.connected) {
-    browser = await puppeteer.launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--allow-file-access-from-files'],
-    });
+    browser = await launchBrowser(['--no-sandbox', '--disable-setuid-sandbox']);
   }
   return browser;
+}
+
+function sendRenderError(res, err) {
+  if (err.code === 'chrome_missing') {
+    return res.status(503).json({ error: 'Chrome not found', code: 'chrome_missing' });
+  }
+  if (err.code === 'browser_launch_failed') {
+    return res.status(503).json({ error: 'Browser launch failed', code: 'browser_launch_failed' });
+  }
+  res.status(500).json({ error: err.message });
 }
 
 const app = express();
@@ -98,7 +106,7 @@ app.post('/api/generate-long', rateLimit(), async (req, res) => {
     res.send(buffer);
   } catch (err) {
     console.error('Generate-long error:', err);
-    if (!res.headersSent) res.status(500).json({ error: err.message });
+    if (!res.headersSent) sendRenderError(res, err);
   }
 });
 
@@ -115,7 +123,7 @@ app.post('/api/generate', rateLimit(), async (req, res) => {
     await archive.finalize();
   } catch (err) {
     console.error('Generate error:', err);
-    if (!res.headersSent) res.status(500).json({ error: err.message });
+    if (!res.headersSent) sendRenderError(res, err);
   }
 });
 
@@ -130,5 +138,26 @@ app.use(express.static(path.join(__dirname, 'public'), { etag: false, maxAge: 0 
 app.use('/fonts', express.static(FONTS_DIR));
 app.get('/test.json', (req, res) => res.sendFile(path.join(__dirname, 'test.json')));
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
+// Keep API failures JSON-shaped so the web UI can show a useful message.
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Payload too large', code: 'payload_too_large' });
+  }
+  if (err instanceof SyntaxError && 'body' in err) {
+    return res.status(400).json({ error: 'Invalid JSON body', code: 'invalid_body' });
+  }
+  next(err);
+});
+
+const PORT = Number(process.env.PORT || 3000);
+const server = app.listen({ port: PORT, exclusive: true });
+server.on('listening', () => console.log(`Server running at http://localhost:${PORT}`));
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`端口 ${PORT} 已被占用。请换一个端口启动，例如：PORT=${PORT + 1} npm start`);
+    console.error(`Port ${PORT} is already in use. Try: PORT=${PORT + 1} npm start`);
+    process.exit(1);
+  }
+  throw err;
+});
