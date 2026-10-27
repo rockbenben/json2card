@@ -31,13 +31,14 @@ No schema to define and no tidying up in Figma afterwards: the format is figured
 docker run -d -p 3000:3000 ghcr.io/rockbenben/json2card:latest
 ```
 
-**Docker Compose**:
+**Docker Compose** (maps to port 7882):
 
 ```bash
 docker compose up -d
+# Open http://localhost:7882
 ```
 
-**From source**:
+**From source** (needs Node.js ≥ 22.12 — puppeteer's floor):
 
 ```bash
 npm install && npm run setup-fonts && npm start
@@ -183,24 +184,40 @@ All fields optional. Defaults used when omitted — notably `coverTitle` falls b
 
 ## Limitations
 
-- Rendering drives headless Chromium (Puppeteer): the Docker image ships it; from source, first run downloads a browser.
+- Rendering drives headless Chromium (Puppeteer). The Docker image ships the apt-installed Chromium, so nothing is downloaded at install time; a source install downloads Chromium during `npm install`, and if that download was skipped the app falls back to an installed Chrome (or run `npx puppeteer browsers install chrome`).
 - Browser font upload embeds the file as a data URI — fine for Latin or subset fonts, capped at ~8 MB (full CJK families won't fit; install them under `fonts/` instead).
 - The API rate-limits to 10 requests/min per IP by default (`RATE_LIMIT=0` disables) — worth setting before you expose a public instance.
 
 ## Project Structure
 
 ```text
-generate.mjs        — render engine
-server.mjs          — Express API + CORS
-fonts.mjs           — font scanning
-template.html       — card template
-public/             — web UI + i18n
-Dockerfile          — one-command deploy
-docker-compose.yml  — compose deploy
+generate.mjs          — render engine (CLI + programmatic API)
+launch-browser.mjs    — shared Chromium launcher (server + CLI)
+server.mjs            — Express API + CORS
+fonts.mjs             — font scanning
+template.html         — card template
+public/               — web UI + i18n
+  card-rules.js       — card rules shared by preview and export
+scripts/              — font downloader (npm run setup-fonts)
+test-cards.mjs        — unit tests (npm test)
+test.json             — sample payload for the CLI
+docs/                 — README images
+Dockerfile            — one-command deploy
+docker-compose.yml    — compose deploy
 ```
+
+## Testing
 
 ```bash
 npm test
+```
+
+Covers the pure helpers (color assignment, filename sanitising, font scanning). Rendering
+is not covered by the unit tests — check it by running the CLI, which writes the sample
+cards to `output/`:
+
+```bash
+npm run generate
 ```
 
 ## About the 365 Open Source Plan

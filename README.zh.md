@@ -31,13 +31,14 @@
 docker run -d -p 3000:3000 ghcr.io/rockbenben/json2card:latest
 ```
 
-**Docker Compose**:
+**Docker Compose**（映射到 7882 端口）:
 
 ```bash
 docker compose up -d
+# 打开 http://localhost:7882
 ```
 
-**从源码运行**:
+**从源码运行**（需要 Node.js ≥ 22.12 —— puppeteer 的最低要求）:
 
 ```bash
 npm install && npm run setup-fonts && npm start
@@ -183,24 +184,39 @@ node generate.mjs --body-font X  # 自定义字体
 
 ## 限制
 
-- 渲染驱动无头 Chromium（Puppeteer）：Docker 镜像已内置；从源码跑的话，首次启动会下载一个浏览器。
+- 渲染驱动无头 Chromium（Puppeteer）：Docker 镜像内置 apt 安装的 Chromium，装镜像时无需下载；从源码安装会在 `npm install` 时下载 Chromium，若下载被跳过则会回退到本机已安装的 Chrome（也可运行 `npx puppeteer browsers install chrome`）。
 - 浏览器上传字体按 data URI 内嵌——适合拉丁或子集字体，上限约 8 MB（完整中文字塞不下，装到 `fonts/` 目录里即可）。
 - API 默认每 IP 每分钟 10 次限流（`RATE_LIMIT=0` 关闭）——对外公开实例前记得设。
 
 ## 项目结构
 
 ```text
-generate.mjs        — 渲染引擎
-server.mjs          — Express API + CORS
-fonts.mjs           — 字体扫描
-template.html       — 卡片模板
-public/             — 网页界面 + 国际化
-Dockerfile          — 一键部署
-docker-compose.yml  — Compose 部署
+generate.mjs          — 渲染引擎（CLI + 可编程接口）
+launch-browser.mjs    — 共用的 Chromium 启动器（服务端 + CLI）
+server.mjs            — Express API + CORS
+fonts.mjs             — 字体扫描
+template.html         — 卡片模板
+public/               — 网页界面 + 国际化
+  card-rules.js       — 预览与导出共用的卡片规则
+scripts/              — 字体下载脚本（npm run setup-fonts）
+test-cards.mjs        — 单元测试（npm test）
+test.json             — CLI 用的示例数据
+docs/                 — README 配图
+Dockerfile            — 一键部署
+docker-compose.yml    — Compose 部署
 ```
+
+## 测试
 
 ```bash
 npm test
+```
+
+覆盖纯函数（配色分配、文件名清理、字体扫描）。渲染不在单元测试覆盖范围内——
+用 CLI 验证，它会把示例卡片写进 `output/`：
+
+```bash
+npm run generate
 ```
 
 ## 关于 365 开源计划

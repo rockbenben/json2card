@@ -12,7 +12,7 @@ const FORMAT_MAP = {
 
 /**
  * Convert a font filename to a human-readable display name.
- * "NotoSerifSC-Regular.woff2" → "Noto Serif SC"
+ * "NotoSerifSC-Regular.otf" → "Noto Serif SC"
  */
 function fileToDisplayName(filename) {
   const stem = path.parse(filename).name;

@@ -17,8 +17,9 @@ export const USER_STYLE = { gradientStart: '#0c0c0c', gradientEnd: '#1a1a1a', te
 
 // 16-color palette — ordered by greedy farthest-point so the FIRST k speakers
 // are maximally distinguishable (prefix-min distance: k4 0.02→0.32, k8 0.02→0.15).
-// Near-dupe families (peach≈terracotta, sand≈caramel, lake≈mint, ocean≈dusty blue)
-// were replaced with amber / mist-blue / olive / cobalt.
+// Constraint: no two slots may read as the same hue family. An earlier palette
+// paired peach/terracotta, sand/caramel, lake/mint and ocean/dusty-blue; those
+// four near-dupes were re-picked to amber, olive, cobalt and the blue at index 1.
 export const COLOR_PALETTE = [
   { gradientStart: '#c4836e', gradientEnd: '#915b4a' },  // 赤陶 terracotta
   { gradientStart: '#5d8a9e', gradientEnd: '#3f6475' },  // 雾霾蓝 dusty blue
@@ -355,7 +356,9 @@ async function splitByRendering(page, colorConfig, content, config) {
 let _templateCache = null, _templatePath = null;
 let _fontCSSCache = null, _fontCacheKey = null;
 let _allFonts = null, _allFontsDir = null;
-// Page pool: reuse page with fonts already loaded (skip ~1s font load on 2nd+ render)
+// Warm page: one page kept alive with its fonts already loaded, so the 2nd+ render
+// skips the ~1s font load. Keyed by card size + font set; a different size or font
+// choice retires it.
 let _warmPage = null, _warmPageKey = null, _warmPageBrowser = null;
 
 /** Coerce a message's content to a plain string. Handles OpenAI-style content

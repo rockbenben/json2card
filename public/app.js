@@ -57,7 +57,9 @@ function escapeHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// Mirror of generate.mjs safeFileName — download names must be filesystem-safe too
+// Mirror of generate.mjs safeFileName — download names must be filesystem-safe too.
+// Keep the two in step; only the fallback differs on purpose ('cards' here for a
+// multi-card download, 'card' there for a single exported file).
 function safeFileName(s, fallback = 'cards') {
   const cleaned = String(s ?? '')
     .replace(/[\\/:*?"<>|\x00-\x1f]/g, '-')
@@ -72,7 +74,10 @@ if (typeof removeMarkdown === 'undefined') {
   window.removeMarkdown = function(s) { return s; };
 }
 
-// Style constants — loaded from server, with inline fallbacks
+// Style constants — loaded from server, with inline fallbacks.
+// The fallbacks below are a hand-copy of generate.mjs and MUST stay byte-identical
+// to it: the preview (browser) and the export (Node) derive colors and icons from
+// these lists, and a drift shows up as preview/export mismatches.
 let USER_STYLE = { gradientStart: '#0c0c0c', gradientEnd: '#1a1a1a', textColor: '#f0e6d2', icon: '📜' };
 let COLOR_PALETTE = [
   { gradientStart: '#c4836e', gradientEnd: '#915b4a' },
@@ -104,8 +109,9 @@ function getCharStyle(name, index) {
   return { ...color, textColor: 'white', icon, label: name, name };
 }
 
-// Font pairings — body + label combinations
-// Font pairings — names must match scanFonts displayName exactly
+// Font pairings — body + label combinations.
+// The names must match scanFonts displayName exactly, or the pairing won't resolve
+// to a real font and the preview falls back to the default.
 let FONT_PAIRINGS = {
   classic:  { body: 'Noto Serif SC', label: 'Noto Sans SC', i18n: 'pairClassic' },
   modern:   { body: 'Harmony OS Sans SC', label: 'Harmony OS Sans SC', i18n: 'pairModern' },
