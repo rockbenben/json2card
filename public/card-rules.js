@@ -96,10 +96,10 @@ const CardRules = (() => {
     </span>
     <span>${o.kicker}</span>
   </div>
-  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
-    ${o.title && o.title.trim() ? `<div style="font-size:${px(62)}px;line-height:1.22;letter-spacing:${px(1)}px;font-weight:600;margin-bottom:${px(38)}px;${label}">${o.title}</div>
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;min-height:0;">
+    ${o.title && o.title.trim() ? `<div style="font-size:${px(62)}px;line-height:1.22;letter-spacing:${px(1)}px;font-weight:600;margin-bottom:${px(38)}px;${label}display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;word-break:break-word;">${o.title}</div>
     <div style="width:${px(56)}px;height:${Math.max(1.5, px(2))}px;background:currentColor;opacity:0.35;margin-bottom:${px(38)}px;"></div>` : ''}
-    <div style="font-size:${px(30)}px;line-height:1.95;opacity:0.74;font-family:${o.bodyFont},'Noto Serif SC',serif;">${o.summary}</div>
+    <div style="font-size:${px(30)}px;line-height:1.95;opacity:0.74;font-family:${o.bodyFont},'Noto Serif SC',serif;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:5;overflow:hidden;word-break:break-word;">${o.summary}</div>
   </div>
   <div style="font-size:${px(22)}px;line-height:1.7;letter-spacing:${px(2)}px;opacity:0.5;">${o.names}</div>
 </div>`;

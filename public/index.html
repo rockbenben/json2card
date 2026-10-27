@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Turn any JSON into clean, on-brand shareable cards — chat exports (ChatGPT, Claude, Slack, Discord, Telegram) auto-detected. Customize colors and fonts; export via Web, CLI, or API.">
   <title>json2card — chat exports & JSON into shareable cards</title>
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
   <header>
@@ -42,10 +42,22 @@
         </div>
         <input type="file" id="fileInput" accept=".json" hidden>
         <textarea id="jsonInput" data-i18n-placeholder="jsonPlaceholder"></textarea>
+        <a href="#previewCards" id="mobilePreviewLink" class="mobile-preview-link" data-i18n="viewPreview"></a>
+        <div id="draftBar" class="draft-bar" hidden>
+          <span id="draftLabel"></span>
+          <div class="draft-actions">
+            <button type="button" id="draftRestore" class="draft-btn" data-i18n="draftContinue"></button>
+            <button type="button" id="draftDiscard" class="draft-btn ghost" data-i18n="draftDiscard"></button>
+          </div>
+        </div>
+        <p id="draftError" class="draft-error" role="status" aria-live="polite" hidden></p>
       </section>
 
       <section class="mapping-section">
         <h2><span data-i18n="mappingRules"></span><button id="toggleMapping" class="toggle-btn" aria-expanded="false">▶</button></h2>
+        <label id="conversationRow" style="display:none"><span data-i18n="conversation"></span>
+          <select id="conversationSelect"></select>
+        </label>
         <div id="mappingPanel" class="collapsed">
           <div style="margin-bottom:10px;">
             <label><span data-i18n="detectedFormat"></span> <select id="formatSelect"></select></label>
@@ -170,13 +182,14 @@
         <span id="cardCount"></span>
         <button id="exportLongBtn" disabled data-i18n="exportLong"></button>
         <button id="exportBtn" disabled data-i18n="exportZip"></button>
+        <span id="exportStatus" role="status" aria-live="polite"></span>
       </div>
     </div>
   </main>
 
   <script src="/vendor/remove-markdown.js"></script>
-  <script src="i18n.js?v=3"></script>
-  <script src="card-rules.js?v=4"></script>
-  <script src="app.js?v=10"></script>
+  <script src="i18n.js?v=9"></script>
+  <script src="card-rules.js?v=5"></script>
+  <script src="app.js?v=24"></script>
 </body>
 </html>

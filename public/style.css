@@ -271,6 +271,48 @@ input[type="text"]:focus, select:focus, textarea:focus {
 .mapping-section input[type="text"], .slot-text { direction: ltr; }
 #jsonInput::placeholder { color: var(--paper-faint); }
 
+/* ── Draft restore strip / mobile preview jump ── */
+.mobile-preview-link { display: none; }
+.draft-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding: 7px 9px;
+  border: 1px dashed var(--rule-2);
+  font-size: 11px;
+  color: var(--paper-dim);
+}
+.draft-bar[hidden] { display: none; }
+#draftLabel {
+  flex: 1 1 140px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draft-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.draft-btn {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 4px 8px;
+  background: var(--ink-700);
+  border: 1px solid var(--rule-2);
+  color: var(--paper-dim);
+  cursor: pointer;
+  transition: color .12s, border-color .12s, background .12s;
+}
+.draft-btn:hover { color: var(--paper); border-color: var(--paper-faint); }
+.draft-btn.ghost { background: transparent; }
+.draft-error {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--err);
+  line-height: 1.5;
+}
+.draft-error[hidden] { display: none; }
+
 /* ── Data-format (mapping) ── */
 .mapping-section h2 { display: flex; align-items: center; }
 .toggle-btn {
@@ -793,6 +835,13 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 }
 #exportBtn:hover:not(:disabled) { background: var(--cyan-2); border-color: var(--cyan-2); }
 #exportBtn:disabled, #exportLongBtn:disabled { opacity: 0.32; cursor: not-allowed; }
+#exportStatus {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ok);
+  letter-spacing: 0.02em;
+}
+#exportStatus.warn { color: var(--err); }
 
 /* ── Preset "switched to custom" flash ── */
 @keyframes preset-flash { 0% { box-shadow: 0 0 0 1px var(--cyan); } 100% { box-shadow: none; } }
@@ -808,6 +857,20 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   .panel { width: 100%; border-right: none; border-bottom: 1px solid var(--rule); overflow: visible; }
   .panel section { padding: 14px 16px; }
   #jsonInput { height: 130px; }
+  .mobile-preview-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 8px;
+    padding: 7px 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--cyan);
+    border: 1px solid var(--rule-2);
+    text-decoration: none;
+  }
+  .mobile-preview-link:hover { color: var(--paper); border-color: var(--paper-faint); }
   .config-section label { flex-wrap: wrap; }
   .config-section input[type="text"], .config-section select { width: 148px; }
   .mapping-section label { flex-wrap: wrap; gap: 4px; }
@@ -819,6 +882,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
   .card-preview { padding: 18px; }
   .export-bar { flex-wrap: wrap; gap: 8px; padding: 12px 14px; }
   #cardCount { width: 100%; margin-bottom: 2px; }
+  #exportStatus { width: 100%; text-align: center; }
   #exportBtn, #exportLongBtn { flex: 1; text-align: center; }
 }
 

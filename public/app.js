@@ -32,6 +32,14 @@ let currentConfig = {
 let availableFonts = [];
 let rawJson = null; // unparsed original JSON (before normalization)
 
+const DRAFT_KEY = 'cardDraft';
+let pendingDraft = null;
+let _draftTimer = null;
+let _draftErrorTimer = null;
+let _exportStatusTimer = null;
+let exporting = false;
+let previewRevision = 0;
+
 // JSON field mapping — defines how to extract data from any JSON format
 let jsonMapping = {
   messages: 'messages',
@@ -121,6 +129,7 @@ async function init() {
   bindSlotEvents();
   loadHistory();
   bindEvents();
+  loadDraft();
 }
 
 /** Apply translations to all data-i18n elements + dynamic dropdowns */
@@ -198,6 +207,11 @@ function applyI18n() {
   // Re-translate format hint if visible
   if (detectedFormat) {
     $('#formatHint').textContent = t('formatDetected', { label: t(detectedFormat.i18nLabel), hint: t(detectedFormat.i18nHint) });
+  }
+
+  if (pendingDraft) {
+    const label = $('#draftLabel');
+    if (label) label.textContent = t('draftRestore', { title: pendingDraft.title || t('defaultCoverFallback') });
   }
 }
 
@@ -399,7 +413,26 @@ function bindEvents() {
   });
 
   // Clear history
-  $('#clearHistory').addEventListener('click', () => { localStorage.removeItem('cardHistory'); loadHistory(); });
+  $('#clearHistory').addEventListener('click', () => {
+    if (!confirm(t('clearHistoryConfirm'))) return;
+    localStorage.removeItem('cardHistory');
+    loadHistory();
+  });
+
+  // Restore or dismiss the last-edit draft strip
+  const draftRestoreBtn = $('#draftRestore');
+  if (draftRestoreBtn) draftRestoreBtn.addEventListener('click', () => {
+    const draft = pendingDraft;
+    if (draft) restoreSnapshot(draft);
+    pendingDraft = null;
+    hideDraftBar();
+  });
+  const draftDiscardBtn = $('#draftDiscard');
+  if (draftDiscardBtn) draftDiscardBtn.addEventListener('click', () => {
+    pendingDraft = null;
+    localStorage.removeItem(DRAFT_KEY);
+    hideDraftBar();
+  });
 
   // Theme toggle
   $('#themeToggle').addEventListener('click', () => {
@@ -552,6 +585,14 @@ function bindEvents() {
     if (!id) { if (rawJson) { autoDetectMapping(rawJson); syncMappingToUI(); normalizeAndPreview(); } return; }
     const tmpl = FORMAT_TEMPLATES.find(t => t.id === id);
     if (tmpl && rawJson) {
+      if (id === 'nested-mapping' && Array.isArray(rawJson)) {
+        autoDetectMapping(rawJson);
+        syncMappingToUI();
+        normalizeAndPreview();
+        return;
+      }
+      conversationList = null;
+      conversationIndex = 0;
       detectedFormat = tmpl;
       // Apply template mapping
       jsonMapping._arrayMode = !!tmpl.arrayMode;
@@ -564,6 +605,11 @@ function bindEvents() {
       syncMappingToUI();
       normalizeAndPreview();
     }
+  });
+
+  $('#conversationSelect').addEventListener('change', () => {
+    conversationIndex = +$('#conversationSelect').value || 0;
+    normalizeAndPreview();
   });
 }
 
@@ -592,26 +638,53 @@ async function loadExample() {
   handleJsonChange();
 }
 
+function jsonErrorMessage(err) {
+  if (/Unexpected end of JSON input|Unterminated string|Unexpected end of input/i.test(err.message)) return t('jsonIncomplete');
+  const m = /line\s+(\d+)\s+column\s+(\d+)/i.exec(err.message);
+  return m ? t('jsonErrorAt', { line: m[1], col: m[2] }) : t('jsonError', { msg: err.message });
+}
+
 function handleJsonChange() {
   const text = $('#jsonInput').value.trim();
-  if (!text) { rawJson = null; currentData = null; clearPreview(); return; }
+  if (!text) {
+    rawJson = null;
+    currentData = null;
+    pendingDraft = null;
+    localStorage.removeItem(DRAFT_KEY);
+    hideDraftBar();
+    hideDraftError();
+    clearPreview();
+    return;
+  }
+  let parsed;
   try {
-    rawJson = JSON.parse(text);
-    autoDetectMapping(rawJson);
-    syncMappingToUI();
-    normalizeAndPreview();
+    parsed = JSON.parse(text);
   } catch (err) {
     rawJson = null;
     currentData = null;
-    showError(t('jsonError', { msg: err.message }));
+    showError(jsonErrorMessage(err));
+    return;
+  }
+  rawJson = parsed;
+  try {
+    autoDetectMapping(rawJson);
+    syncMappingToUI();
+    normalizeAndPreview();
+    pendingDraft = null;
+    hideDraftBar();
+  } catch (err) {
+    console.error('Preview error:', err);
+    currentData = null;
+    showError(t('previewFailed', { msg: err.message }), false);
   }
 }
 
 // ── JSON Mapping ──
 
-/** Resolve a dot-path like "data.items" on an object */
+/** Resolve a dot-path like "data.items" on an object; "." addresses the root */
 function getByPath(obj, path) {
   if (!path) return undefined;
+  if (path === '.') return obj;
   return path.split('.').reduce((o, k) => o?.[k], obj);
 }
 
@@ -673,39 +746,59 @@ const FORMAT_TEMPLATES = [
     detect: (s) => s.author && (s.author.name || s.author.username) && typeof s.content === 'string' },
   { id: 'user-text', i18nLabel: 'fmtUserText', i18nHint: 'fmtUserTextHint',
     paths: ['.'], role: 'user', content: 'text', charId: 'user', userRole: '',
-    detect: (s) => s.user && s.text && s.ts },
+    detect: (s) => s.user && typeof s.text === 'string' },
   { id: 'nested-mapping', i18nLabel: 'fmtMapping', i18nHint: 'fmtMappingHint',
     paths: ['mapping'], custom: true,
     detect: () => false },
 ];
 
 let detectedFormat = null;
+let conversationList = null;
+let conversationIndex = 0;
+
+function isChatGptConversation(item) {
+  return item && typeof item === 'object' && item.mapping && typeof item.mapping === 'object' &&
+    Object.values(item.mapping).some(n => n?.message?.content?.parts);
+}
 
 /** Auto-detect: score each format template against the data, pick best match */
 function autoDetectMapping(json) {
   detectedFormat = null;
+  conversationList = null;
+  conversationIndex = 0;
 
-  // ChatGPT export — verify deep structure (mapping.*.message.content.parts)
-  if (json.mapping && typeof json.mapping === 'object' && !Array.isArray(json.mapping) &&
-      Object.values(json.mapping).some(n => n?.message?.content?.parts)) {
+  // ChatGPT export — conversations.json is an array of conversations, so offer
+  // the list instead of making the user hand-extract one object.
+  if (Array.isArray(json) && json.length) {
+    const conversations = json.filter(isChatGptConversation);
+    if (conversations.length) {
+      conversationList = conversations;
+      detectedFormat = FORMAT_TEMPLATES.find(t => t.id === 'nested-mapping');
+      return;
+    }
+  }
+
+  // A single ChatGPT conversation object (mapping.*.message.content.parts)
+  if (isChatGptConversation(json)) {
     detectedFormat = FORMAT_TEMPLATES.find(t => t.id === 'nested-mapping');
     return;
   }
 
-  // Top-level array with {user, text, ts} (Slack)
+  // Top-level array with {user, text} (Slack)
   if (Array.isArray(json) && json.length > 0) {
     const samples = json.slice(0, Math.min(3, json.length));
-    if (samples.filter(s => s.user && s.text && s.ts).length > samples.length / 2) {
+    if (samples.filter(s => s && typeof s === 'object' && s.user && typeof s.text === 'string').length > samples.length / 2) {
       detectedFormat = FORMAT_TEMPLATES.find(t => t.id === 'user-text');
       return;
     }
   }
 
-  // Known paths + auto-discovered fallback
+  // Known paths + auto-discovered fallback. A root-level message array is
+  // addressed as "." so plain lists (the simplest documented shape) work too.
   const knownPaths = ['messages', 'data.messages', 'items', 'data', 'conversation', 'records', 'questions', 'chat', 'history', 'dialog', 'results'];
   const discovered = findMessageArray(json);
-  const tryPaths = discovered && !knownPaths.includes(discovered)
-    ? [...knownPaths, discovered] : knownPaths;
+  const tryPaths = Array.isArray(json) ? ['.']
+    : discovered && !knownPaths.includes(discovered) ? [...knownPaths, discovered] : knownPaths;
 
   for (const msgPath of tryPaths) {
     const arr = getByPath(json, msgPath);
@@ -713,7 +806,9 @@ function autoDetectMapping(json) {
 
     // Multi-sample: check up to 3 messages, require majority match
     const samples = arr.slice(0, Math.min(3, arr.length));
-    const isDiscovered = discovered && msgPath === discovered && !knownPaths.includes(msgPath);
+    if (msgPath === '.' && !samples.every(s => s !== null && typeof s === 'object')) continue;
+    const isDiscovered = msgPath === '.' ||
+      (discovered && msgPath === discovered && !knownPaths.includes(msgPath));
 
     for (const tmpl of FORMAT_TEMPLATES) {
       if (tmpl.custom) continue;
@@ -808,7 +903,7 @@ function normalizeJson(json) {
     }).filter(m => m.content.trim());
     const characters = [...new Set(messages.filter(m => m.role === 'character').map(m => m.characterId))]
       .filter(id => id && !_hiddenSet.has(id.toLowerCase()));
-    return { type: 'roundtable', characters, messages, title: json.title || '' };
+    return { type: 'roundtable', characters, messages, title: json.title != null ? String(json.title) : '' };
   }
 
   // Slack export: top-level array or messages array
@@ -860,7 +955,7 @@ function normalizeJson(json) {
   }
   characters = characters.filter(id => id && !_hiddenSet.has(id.toLowerCase()));
 
-  return { type: 'roundtable', characters, messages, title: json.title || '' };
+  return { type: 'roundtable', characters, messages, title: json.title != null ? String(json.title) : '' };
 }
 
 /** Normalize raw JSON and update preview */
@@ -886,10 +981,26 @@ function updateFormatUI() {
     el.disabled = arr;
     el.style.opacity = arr ? '.45' : '';
   }
+
+  // ChatGPT conversations.json: let the user pick which conversation to card.
+  const convoRow = $('#conversationRow');
+  if (convoRow) {
+    if (conversationList && conversationList.length > 1) {
+      convoRow.style.display = '';
+      $('#conversationSelect').innerHTML = conversationList.map((c, i) =>
+        `<option value="${i}" ${i === conversationIndex ? 'selected' : ''}>${escapeHtml(c.title != null && c.title !== '' ? String(c.title) : `#${i + 1}`)}</option>`).join('');
+    } else {
+      convoRow.style.display = 'none';
+    }
+  }
+}
+
+function activeJson() {
+  return conversationList?.length ? conversationList[conversationIndex] : rawJson;
 }
 
 function normalizeAndPreview() {
-  currentData = normalizeJson(rawJson);
+  currentData = normalizeJson(activeJson());
   if (!currentData) {
     updateFormatUI();
     showNotice(t('noArrayFound'));
@@ -918,8 +1029,8 @@ function populateSlotDropdowns() {
   // Collect extra fields from raw JSON messages
   const extraFields = [];
   if (rawJson) {
-    const msgs = getByPath(rawJson, jsonMapping.messages);
-    if (Array.isArray(msgs) && msgs.length > 0) {
+    const msgs = getByPath(activeJson(), jsonMapping.messages);
+    if (Array.isArray(msgs) && msgs.length > 0 && !Array.isArray(msgs[0])) {
       for (const key of Object.keys(msgs[0])) {
         if (!['content', 'role', 'characterId'].includes(key) &&
             !BUILT_IN_SOURCES.some(s => s.value === key)) {
@@ -1126,14 +1237,20 @@ function renderStyleGallery() {
 }
 
 let _fitTimer = null;  // debounce handle for the preview auto-fit pass
-function updatePreview() {
+function updatePreview({ skipDraftSave = false } = {}) {
   if (!currentData?.messages) { clearPreview(); return; }
+  if (!currentData.messages.length) { showNotice(t('noMessages')); return; }
+  previewRevision++;
+  setExportStatus('');
   $('#previewCards').classList.remove('is-empty');
   $('#jsonInput').classList.remove('invalid');
 
   const container = $('#previewCards');
   const aspect = getAspect(currentConfig.cardSize || '3:4');
   container.innerHTML = '';
+
+  const cards = CardRules.buildCardList(currentData.messages, currentData.characters, getColorForMsg, USER_STYLE);
+  const total = 1 + cards.length;  // cover + rendered message cards
 
   // Cover card — a title plate; data + markup shared with the export via CardRules
   const cover = CardRules.coverData(currentData.messages, currentData.characters, currentConfig);
@@ -1148,22 +1265,24 @@ function updatePreview() {
     _coverNames: cover.names,
     _coverKicker: cover.kicker,
     name: coverTitle,
-  }, 1, currentData.messages.length + 1, aspect);
+  }, 1, total, aspect);
   container.appendChild(coverEl);
 
   // Message cards — shared rules from card-rules.js
-  const cards = CardRules.buildCardList(currentData.messages, currentData.characters, getColorForMsg, USER_STYLE);
   let cardIdx = 2;
   cards.forEach(card => {
-    const el = createCardPreview(card, cardIdx++, currentData.messages.length + 1, aspect, card._rawMsg);
+    const el = createCardPreview(card, cardIdx++, total, aspect, card._rawMsg);
     container.appendChild(el);
   });
 
-  const nCards = 1 + cards.length;  // cover + rendered message cards — what the ZIP contains
-  $('#cardCount').textContent = t('previewCount', { n: nCards });
-  $('#proofMeta').textContent = t('cardsMeta', { n: nCards, size: currentConfig.cardSize || '3:4' });
-  $('#exportBtn').disabled = false;
-  $('#exportLongBtn').disabled = false;
+  const hasLongBody = cards.some(card => String(card.content || '').length > 400);
+  $('#cardCount').textContent = t('previewCount', { n: total }) + (hasLongBody ? ' · ' + t('previewPaged') : '');
+  $('#proofMeta').textContent = t('cardsMeta', { n: total, size: currentConfig.cardSize || '3:4' });
+  if (!exporting) {
+    $('#exportBtn').disabled = false;
+    $('#exportLongBtn').disabled = false;
+  }
+  if (!skipDraftSave) scheduleDraftSave();
 
   // Auto-fit preview bodies to mirror the export (short → larger type). Debounced:
   // autoFitFontSize forces reflows, and updatePreview reruns on every slider tick,
@@ -1268,6 +1387,7 @@ function createCardPreview(card, index, total, aspect, rawMsg = {}) {
 }
 
 function clearPreview() {
+  previewRevision++;
   const grid = $('#previewCards');
   grid.classList.add('is-empty');
   grid.innerHTML = `<p class="empty">${t('previewHint')}</p>`;
@@ -1279,6 +1399,7 @@ function clearPreview() {
 }
 
 function showNotice(msg) {
+  previewRevision++;
   const grid = $('#previewCards');
   grid.classList.add('is-empty');
   grid.innerHTML = `<p class="empty notice">${escapeHtml(msg)}</p>`;
@@ -1289,48 +1410,83 @@ function showNotice(msg) {
   $('#exportLongBtn').disabled = true;
 }
 
-function showError(msg) {
+function showError(msg, markInput = true) {
+  previewRevision++;
   const grid = $('#previewCards');
   grid.classList.add('is-empty');
   grid.innerHTML = `<p class="empty err">${escapeHtml(msg)}</p>`;
   $('#cardCount').textContent = '';
   const pm = $('#proofMeta'); if (pm) pm.textContent = '';
-  $('#jsonInput').classList.add('invalid');
+  $('#jsonInput').classList.toggle('invalid', markInput);
   $('#exportBtn').disabled = true;
   $('#exportLongBtn').disabled = true;
 }
 
 // ── Export ──
 
-async function handleExport() {
-  if (!currentData) return;
+async function exportErrorMessage(res) {
+  let body = null;
+  try { body = await res.json(); } catch {}
+  if (body?.code === 'chrome_missing') return t('chromeMissing');
+  if (body?.code === 'browser_launch_failed') return t('browserLaunchFailed');
+  if (res.status === 429) return t('exportRateLimited');
+  return body?.error || `HTTP ${res.status}`;
+}
 
+function setExportStatus(msg, warn = false) {
+  const el = $('#exportStatus');
+  if (!el) return;
+  clearTimeout(_exportStatusTimer);
+  el.textContent = msg || '';
+  el.classList.toggle('warn', !!warn);
+  if (!msg) return;
+  _exportStatusTimer = setTimeout(() => {
+    el.textContent = '';
+    el.classList.remove('warn');
+  }, 4000);
+}
+
+async function handleExport() {
+  if (!currentData || exporting) return;
+
+  const dataForExport = currentData;
+  const configForExport = structuredClone(currentConfig);
+  const rawForExport = rawJson;
+  const mappingForExport = { ...jsonMapping };
+  const revisionAtExport = previewRevision;
+
+  exporting = true;
   const btn = $('#exportBtn');
   btn.disabled = true;
   $('#exportLongBtn').disabled = true;  // one render at a time
   btn.textContent = t('generating');
+  setExportStatus('');
 
   try {
     const res = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: currentData, config: currentConfig }),
+      body: JSON.stringify({ data: dataForExport, config: configForExport }),
     });
 
-    if (!res.ok) throw new Error(`Server error: ${res.status}`);
+    if (!res.ok) throw new Error(await exportErrorMessage(res));
 
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = safeFileName(currentConfig.coverTitle) + '.zip';
+    a.download = safeFileName(configForExport.coverTitle) + '.zip';
     a.click();
     URL.revokeObjectURL(url);
 
-    saveHistory();
+    const saved = saveHistory({ data: dataForExport, config: configForExport, rawJson: rawForExport, jsonMapping: mappingForExport });
+    const stale = previewRevision !== revisionAtExport;
+    setExportStatus(t(saved ? (stale ? 'exportDoneStale' : 'exportDone') : 'exportHistoryFailed'), !saved);
   } catch (err) {
-    alert(t('exportFailed', { msg: err.message }));
+    const msg = /Failed to fetch|NetworkError|Load failed/i.test(err.message) ? t('exportOffline') : err.message;
+    alert(t('exportFailed', { msg }));
   } finally {
+    exporting = false;
     btn.disabled = false;
     btn.textContent = t('exportZip');
     if (currentData) $('#exportLongBtn').disabled = false;
@@ -1338,28 +1494,41 @@ async function handleExport() {
 }
 
 async function handleExportLong() {
-  if (!currentData) return;
+  if (!currentData || exporting) return;
+  const dataForExport = currentData;
+  const configForExport = structuredClone(currentConfig);
+  const rawForExport = rawJson;
+  const mappingForExport = { ...jsonMapping };
+  const revisionAtExport = previewRevision;
+  exporting = true;
   const btn = $('#exportLongBtn');
   btn.disabled = true;
   $('#exportBtn').disabled = true;  // one render at a time
   btn.textContent = t('generating');
+  setExportStatus('');
   try {
     const res = await fetch('/api/generate-long', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: currentData, config: currentConfig }),
+      body: JSON.stringify({ data: dataForExport, config: configForExport }),
     });
-    if (!res.ok) throw new Error(`Server error: ${res.status}`);
+    if (!res.ok) throw new Error(await exportErrorMessage(res));
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = safeFileName(currentConfig.coverTitle) + '-long.png';
+    a.download = safeFileName(configForExport.coverTitle) + '-long.png';
     a.click();
     URL.revokeObjectURL(url);
+
+    const saved = saveHistory({ data: dataForExport, config: configForExport, rawJson: rawForExport, jsonMapping: mappingForExport });
+    const stale = previewRevision !== revisionAtExport;
+    setExportStatus(t(saved ? (stale ? 'exportDoneStale' : 'exportDone') : 'exportHistoryFailed'), !saved);
   } catch (err) {
-    alert(t('exportFailed', { msg: err.message }));
+    const msg = /Failed to fetch|NetworkError|Load failed/i.test(err.message) ? t('exportOffline') : err.message;
+    alert(t('exportFailed', { msg }));
   } finally {
+    exporting = false;
     btn.disabled = false;
     btn.textContent = t('exportLong');
     if (currentData) $('#exportBtn').disabled = false;
@@ -1368,23 +1537,94 @@ async function handleExportLong() {
 
 // ── History ──
 
-function saveHistory() {
-  const history = JSON.parse(localStorage.getItem('cardHistory') || '[]');
-  const { customFonts, ...configForHistory } = currentConfig;  // don't persist multi-MB font data-URIs
-  history.unshift({
+function historyTitle(config = currentConfig, data = currentData) {
+  const explicit = config.coverTitle !== '' && config.coverTitle != null ? config.coverTitle : data?.title;
+  if (explicit != null && explicit !== '') return String(explicit);
+  const first = (data?.messages || [])
+    .map(m => String(m.content || '').trim())
+    .find(Boolean) || '';
+  const line = first.split(/\r?\n/)[0].trim();
+  if (!line) return t('defaultCoverFallback');
+  const chars = Array.from(line.slice(0, 50));
+  return chars.slice(0, 24).join('') + (chars.length > 24 ? '…' : '');
+}
+
+function buildSnapshot(source = null) {
+  const data = source?.data ?? currentData;
+  const config = source?.config ?? currentConfig;
+  const raw = source?.rawJson ?? rawJson;
+  const mapping = source?.jsonMapping ?? jsonMapping;
+  const { customFonts, ...configForHistory } = config;  // don't persist multi-MB font data-URIs
+  return {
     timestamp: new Date().toISOString(),
-    title: currentConfig.coverTitle || currentData.title || t('defaultCoverFallback'),
-    messageCount: currentData.messages.length,
+    title: historyTitle(config, data),
+    messageCount: data.messages.length,
     config: configForHistory,
-    jsonMapping: { ...jsonMapping },
-    rawJson: rawJson,
-    jsonData: currentData,
-  });
+    jsonMapping: { ...mapping },
+    rawJson: raw,
+    jsonData: data,
+  };
+}
+
+function saveHistory(source = null) {
+  const history = JSON.parse(localStorage.getItem('cardHistory') || '[]');
+  const entry = buildSnapshot(source);
+  // Re-exporting the same data with the same settings refreshes that entry
+  // instead of filling the list with duplicates.
+  const sig = (x) => JSON.stringify({ rawJson: x.rawJson, config: x.config, jsonMapping: x.jsonMapping });
+  const entrySig = sig(entry);
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (sig(history[i]) === entrySig) history.splice(i, 1);
+  }
+  history.unshift(entry);
   if (history.length > 20) history.length = 20;
   // Never let a full-storage error surface as an export failure.
   try { localStorage.setItem('cardHistory', JSON.stringify(history)); }
-  catch (e) { console.warn('History not saved (storage full):', e.message); }
+  catch (e) { console.warn('History not saved (storage full):', e.message); loadHistory(); return false; }
   loadHistory();
+  return true;
+}
+
+function restoreSnapshot(item, { preserveDraft = false } = {}) {
+  currentConfig = { ...item.config };
+  const savedMapping = item.jsonMapping ? { ...item.jsonMapping } : { ...jsonMapping };
+  currentData = item.jsonData;
+  rawJson = item.rawJson || item.jsonData;
+  conversationList = null;
+  conversationIndex = 0;
+  if (rawJson) {
+    // Re-derive the format/picker state for display, then restore the saved
+    // field mapping (autoDetect updates jsonMapping as a side effect).
+    autoDetectMapping(rawJson);
+    jsonMapping = savedMapping;
+    if (conversationList?.length) {
+      const ci = conversationList.findIndex(c => c.title === currentData?.title);
+      conversationIndex = ci >= 0 ? ci : 0;
+    }
+  } else {
+    jsonMapping = savedMapping;
+  }
+
+  $('#jsonInput').value = rawJson ? JSON.stringify(rawJson, null, 2) : '';
+  $('#coverTitle').value = currentConfig.coverTitle || '';
+  $('#coverExcludeRoles').value = (currentConfig.coverExcludeRoles || []).join(', ');
+  $('#watermark').value = currentConfig.watermark || '';
+  $('#fontSize').value = currentConfig.fontSize;
+  $('#fontSizeValue').textContent = `${currentConfig.fontSize}px`;
+  $('#cardSize').value = currentConfig.cardSize;
+  if (currentConfig.cardStyle) { $('#cardStyleSelect').value = currentConfig.cardStyle; setActiveStyleChip(currentConfig.cardStyle); }
+  if (currentConfig.styleParams) syncStyleParamsToUI();
+  syncBrandUI();
+  restoreCustomFonts();
+
+  syncMappingToUI();
+  updateFormatUI();
+  populateSlotDropdowns();
+  buildCharacterColorPanel();
+  const keepDraft = preserveDraft && !!localStorage.getItem(DRAFT_KEY);
+  updatePreview({ skipDraftSave: keepDraft });
+  pendingDraft = null;
+  hideDraftBar();
 }
 
 function loadHistory() {
@@ -1415,32 +1655,102 @@ function loadHistory() {
   });
 
   container.querySelectorAll('.history-item').forEach(el => {
-    el.addEventListener('click', () => {
-      const idx = +el.dataset.index;
-      const item = history[idx];
-      currentConfig = { ...item.config };
-      if (item.jsonMapping) jsonMapping = { ...item.jsonMapping };
-      rawJson = item.rawJson || item.jsonData;
-      currentData = item.jsonData;
-
-      $('#jsonInput').value = JSON.stringify(rawJson, null, 2);
-      $('#coverTitle').value = currentConfig.coverTitle || '';
-      $('#coverExcludeRoles').value = (currentConfig.coverExcludeRoles || []).join(', ');
-      $('#watermark').value = currentConfig.watermark || '';
-      $('#fontSize').value = currentConfig.fontSize;
-      $('#fontSizeValue').textContent = `${currentConfig.fontSize}px`;
-      $('#cardSize').value = currentConfig.cardSize;
-      if (currentConfig.cardStyle) { $('#cardStyleSelect').value = currentConfig.cardStyle; setActiveStyleChip(currentConfig.cardStyle); }
-      if (currentConfig.styleParams) syncStyleParamsToUI();
-      syncBrandUI();
-      restoreCustomFonts();
-
-      syncMappingToUI();
-      populateSlotDropdowns();
-      buildCharacterColorPanel();
-      updatePreview();
-    });
+    el.addEventListener('click', () => restoreSnapshot(history[+el.dataset.index], { preserveDraft: true }));
   });
+}
+
+// ── Draft ──
+
+function scheduleDraftSave() {
+  clearTimeout(_draftTimer);
+  _draftTimer = setTimeout(saveDraft, 800);
+}
+
+function buildDraft() {
+  const { customFonts, ...config } = currentConfig;
+  return {
+    timestamp: new Date().toISOString(),
+    title: historyTitle(),
+    messageCount: currentData.messages.length,
+    config,
+    jsonMapping: { ...jsonMapping },
+    rawJson,
+    conversationTitle: currentData?.title != null ? String(currentData.title) : '',
+  };
+}
+
+function saveDraft() {
+  if (!currentData?.messages?.length || !rawJson) {
+    localStorage.removeItem(DRAFT_KEY);
+    hideDraftError();
+    return;
+  }
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(buildDraft()));
+    hideDraftError();
+  } catch (e) {
+    console.warn('Draft not saved (storage full):', e.message);
+    showDraftError();
+  }
+}
+
+function showDraftError() {
+  const el = $('#draftError');
+  if (!el) return;
+  el.textContent = t('draftError');
+  el.hidden = false;
+  clearTimeout(_draftErrorTimer);
+  _draftErrorTimer = setTimeout(() => { el.hidden = true; }, 6000);
+}
+
+function hideDraftError() {
+  const el = $('#draftError');
+  if (el) el.hidden = true;
+  clearTimeout(_draftErrorTimer);
+}
+
+function hydrateDraft(draft) {
+  if (draft.jsonData) return draft;  // drafts written by older builds
+  if (!draft.rawJson) return null;
+  autoDetectMapping(draft.rawJson);
+  if (draft.jsonMapping) jsonMapping = { ...draft.jsonMapping };
+  let source = draft.rawJson;
+  if (conversationList?.length) {
+    const wanted = draft.conversationTitle != null ? String(draft.conversationTitle) : '';
+    const ci = conversationList.findIndex(c => (c.title != null ? String(c.title) : '') === wanted);
+    conversationIndex = ci >= 0 ? ci : 0;
+    source = conversationList[conversationIndex];
+  }
+  const data = normalizeJson(source);
+  if (!data?.messages?.length) return null;
+  return { ...draft, jsonData: data };
+}
+
+function loadDraft() {
+  let draft = null;
+  try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); }
+  catch { localStorage.removeItem(DRAFT_KEY); return; }
+  if (!draft?.rawJson) {
+    localStorage.removeItem(DRAFT_KEY);
+    return;
+  }
+  let hydrated = null;
+  try { hydrated = hydrateDraft(draft); }
+  catch (e) { console.warn('Draft could not be restored:', e.message); localStorage.removeItem(DRAFT_KEY); return; }
+  if (!hydrated) {
+    localStorage.removeItem(DRAFT_KEY);
+    return;
+  }
+  pendingDraft = hydrated;
+  const label = $('#draftLabel');
+  if (label) label.textContent = t('draftRestore', { title: hydrated.title || t('defaultCoverFallback') });
+  const bar = $('#draftBar');
+  if (bar) bar.hidden = false;
+}
+
+function hideDraftBar() {
+  const bar = $('#draftBar');
+  if (bar) bar.hidden = true;
 }
 
 // ── Start ──
