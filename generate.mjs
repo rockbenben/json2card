@@ -125,7 +125,7 @@ export function getColorConfig(msg, colorOverrides = {}, charIndex = -1) {
 
 /** Escape HTML to prevent XSS in Puppeteer rendering */
 function escapeHtml(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function paraHtmlOf(raw) {

@@ -54,7 +54,7 @@ let jsonMapping = {
 function getAspect(sizeKey) { return sizeKey.replace(':', ' / '); }
 
 function escapeHtml(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // Mirror of generate.mjs safeFileName — download names must be filesystem-safe too
